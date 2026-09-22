@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Cross-Store Owned — Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>Cross-Store Owned</h1>
+    <p class="lead">Badges games you already own on the other store. Purple <span class="chip gog">G</span> on Steam for games you own on GOG; blue <span class="chip steam">S</span> on GOG for games you own on Steam.</p>
+
+    <section id="permissions" class="card warn" hidden>
+      <h2>Site access needed</h2>
+      <p>The extension needs permission to read your libraries from Steam, GOG, and IsThereAnyDeal.</p>
+      <button id="grant" class="primary">Grant site access</button>
+    </section>
+
+    <form id="form">
+      <section class="card">
+        <h2>Steam library</h2>
+        <label class="radio"><input type="radio" name="steamMethod" value="session"> <span><strong>Use my browser's Steam login</strong> (default) — no setup; just be logged in to <a href="https://store.steampowered.com" target="_blank" rel="noopener">store.steampowered.com</a> in Firefox.</span></label>
+        <label class="radio"><input type="radio" name="steamMethod" value="api"> <span><strong>Use the Steam Web API</strong> — works without being logged in. Needs a key and your SteamID64, and "Game details" set to Public in your <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener">Steam privacy settings</a>.</span></label>
+        <div class="grid" id="apiFields">
+          <label>Steam Web API key <a class="hint" href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">get one</a>
+            <input type="password" name="steamApiKey" autocomplete="off" spellcheck="false" placeholder="32-character key">
+          </label>
+          <label>SteamID64 <a class="hint" href="https://steamid.io" target="_blank" rel="noopener">look it up</a>
+            <input type="text" name="steamId64" inputmode="numeric" pattern="\d{17}" placeholder="7656119…">
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>GOG library</h2>
+        <p>Read from your browser's GOG login. Make sure you are signed in at <a href="https://www.gog.com" target="_blank" rel="noopener">gog.com</a> in Firefox. GOG has no public library API, so there is nothing else to configure.</p>
+      </section>
+
+      <section class="card">
+        <h2>Matching</h2>
+        <p>Games are matched across stores through <a href="https://isthereanydeal.com" target="_blank" rel="noopener">IsThereAnyDeal</a>'s ID database. An API key is optional — lookups currently work without one — but you can add one from <a href="https://isthereanydeal.com/apps/my/" target="_blank" rel="noopener">isthereanydeal.com/apps/my</a>.</p>
+        <p class="note">Keys you enter here are kept in this extension's local storage in Firefox, unencrypted, and are only ever sent to the service they belong to. Blank a field and save to forget a key.</p>
+        <label>IsThereAnyDeal API key (optional)
+          <input type="password" name="itadApiKey" autocomplete="off" spellcheck="false" placeholder="leave blank to use anonymous lookups">
+        </label>
+        <label class="check"><input type="checkbox" name="matchByTitle"> <span><strong>Also match by title</strong> — catches editions the database keeps separate (e.g. owning <em>The Witcher 3</em> on Steam badges the <em>Complete Edition</em> on GOG). Title matches get a dashed ring.</span></label>
+      </section>
+
+      <section class="card">
+        <h2>Refresh &amp; appearance</h2>
+        <div class="grid">
+          <label>Re-read libraries every
+            <span class="inline"><input type="number" name="refreshHours" min="1" max="168" step="1"> hours</span>
+          </label>
+          <label>GOG badge colour <input type="color" name="gogColor"></label>
+          <label>Steam badge colour <input type="color" name="steamColor"></label>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="submit" class="primary">Save</button>
+        <button type="button" id="refresh">Save &amp; refresh now</button>
+        <button type="button" id="clear" class="danger">Clear cached data</button>
+        <span id="saved" class="saved" hidden>Saved</span>
+      </div>
+    </form>
+
+    <section class="card">
+      <h2>Status</h2>
+      <dl id="status" class="status"></dl>
+      <ul id="messages" class="messages"></ul>
+    </section>
+  </main>
+  <script src="../lib/common.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

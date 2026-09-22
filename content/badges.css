@@ -1,0 +1,80 @@
+/* Cross-Store Owned badges. Colours come from --cso-gog / --cso-steam, set from the extension settings. */
+:root {
+  --cso-gog: #7b2fbe;
+  --cso-steam: #1a9fff;
+}
+
+.cso-badge {
+  all: initial;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font: 700 12px/20px -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #fff;
+  background: var(--cso-color, #666);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  white-space: nowrap;
+  vertical-align: middle;
+  z-index: 2147483000;
+  text-decoration: none;
+}
+
+.cso-badge--gog {
+  --cso-color: var(--cso-gog);
+}
+
+.cso-badge--steam {
+  --cso-color: var(--cso-steam);
+}
+
+.cso-badge--overlay {
+  position: absolute;
+  top: 4px;
+}
+
+.cso-badge--overlay.cso-tl {
+  left: 4px;
+}
+
+.cso-badge--overlay.cso-tr {
+  right: 4px;
+}
+
+.cso-badge--inline {
+  margin: 0 6px 0 0;
+}
+
+.cso-badge--expanded {
+  height: 26px;
+  line-height: 26px;
+  margin: 8px 0;
+  padding: 0 12px 0 8px;
+  border-radius: 13px;
+}
+
+/* Title-based (fuzzy) matches get a dashed ring so they read as "probably". */
+.cso-badge--fuzzy {
+  outline: 2px dashed rgba(255, 255, 255, 0.85);
+  outline-offset: -3px;
+}
+
+.cso-badge:hover,
+.cso-badge:focus-visible {
+  filter: brightness(1.15);
+}
+
+.cso-badge__letter {
+  font-weight: 800;
+}
+
+.cso-badge__count,
+.cso-badge__text {
+  font-weight: 600;
+  font-size: 11px;
+}
