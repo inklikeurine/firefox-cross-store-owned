@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.3.0] — 2026-10-05
+
+### Added
+
+- The toolbar icon shows how many games on the current Steam or GOG page you
+  own on the other store, a red **!** when the last library read had a
+  problem, and **…** while one is running.
+- Popup: a card per store with its count and age, and **Log in** when that
+  store's login is the problem; "You own N games on both stores"; a progress
+  bar during a refresh; **On this page**, listing the badged games of the
+  current store page with **Hide** / **Show** for wrong matches; **Do I own…?**,
+  a search across both libraries.
+- Settings: **Owned on both stores**, every game you own on both, editions
+  grouped, with store links and a filter; switches for Steam badges, GOG
+  badges and the toolbar count; badge text as a letter or the store name; a
+  live badge preview and **Default colours**; **Show all hidden badges again**.
+- The SteamID64 field accepts a profile link, or a custom profile name once
+  the Web API key is filled in.
+- On Steam pages without the usual product markup (the wishlist, some hubs),
+  image links to a game get a badge.
+- Opening a Steam page after logging back in re-reads the libraries at once
+  when the last read failed because Steam was logged out.
+
+### Changed
+
+- Settings save as you change them; the Save buttons are gone.
+- Popup and settings page redesigned; the settings page puts the status first.
+- "Not logged in" problems read as such instead of an HTTP or format error.
+- Badge tooltips on title matches say the match is by name; badges have a
+  screen-reader label, a visible keyboard-focus ring, and open on Enter,
+  click or middle-click (not right-click).
+- Turning title matching on or off takes effect at once, without a refresh.
+- The key fields no longer invite Firefox to save them as a website login.
+
+### Fixed
+
+- Changing a colour or another setting no longer postpones the next
+  scheduled refresh; only a new interval does.
+- What IsThereAnyDeal already answered is kept when a later lookup in the
+  same refresh fails, so the next refresh carries on from there.
+- A request that never answers no longer stalls a refresh (30-second
+  timeout).
+- A refresh that was running when Firefox closed no longer shows as running
+  after the next start.
+- A store tile the page reuses for another game is re-checked instead of
+  keeping the old game's badge.
+- Settings values of the wrong type (a corrupt profile) fall back to their
+  defaults instead of being used.
+- Loading the content scripts twice into one page no longer throws.
+
 ## [0.2.0] — 2026-09-21
 
 ### Changed

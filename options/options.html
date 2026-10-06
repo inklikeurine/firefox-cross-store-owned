@@ -2,75 +2,146 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cross-Store Owned — Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <main>
-    <h1>Cross-Store Owned</h1>
-    <p class="lead">Badges games you already own on the other store. Purple <span class="chip gog">G</span> on Steam for games you own on GOG; blue <span class="chip steam">S</span> on GOG for games you own on Steam.</p>
+    <header class="top">
+      <img src="../icons/icon.svg" alt="" width="40" height="40">
+      <div>
+        <h1>Cross-Store Owned <span id="version" class="version"></span></h1>
+        <p class="lead">Purple <span class="chip gog">G</span> on Steam for games you own on GOG; blue <span class="chip steam">S</span> on GOG for games you own on Steam. Settings save as you change them.</p>
+      </div>
+    </header>
 
     <section id="permissions" class="card warn" hidden>
       <h2>Site access needed</h2>
-      <p>The extension needs permission to read your libraries from Steam, GOG, and IsThereAnyDeal.</p>
-      <button id="grant" class="primary">Grant site access</button>
+      <p>Firefox has not given this extension access to Steam, GOG and IsThereAnyDeal, so it cannot read your libraries.</p>
+      <button id="grant" class="primary" type="button">Grant site access</button>
     </section>
 
-    <form id="form">
-      <section class="card">
-        <h2>Steam library</h2>
-        <label class="radio"><input type="radio" name="steamMethod" value="session"> <span><strong>Use my browser's Steam login</strong> (default) — no setup; just be logged in to <a href="https://store.steampowered.com" target="_blank" rel="noopener">store.steampowered.com</a> in Firefox.</span></label>
-        <label class="radio"><input type="radio" name="steamMethod" value="api"> <span><strong>Use the Steam Web API</strong> — works without being logged in. Needs a key and your SteamID64, and "Game details" set to Public in your <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener">Steam privacy settings</a>.</span></label>
-        <div class="grid" id="apiFields">
-          <label>Steam Web API key <a class="hint" href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">get one</a>
-            <input type="password" name="steamApiKey" autocomplete="off" spellcheck="false" placeholder="32-character key">
-          </label>
-          <label>SteamID64 <a class="hint" href="https://steamid.io" target="_blank" rel="noopener">look it up</a>
-            <input type="text" name="steamId64" inputmode="numeric" pattern="\d{17}" placeholder="7656119…">
-          </label>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>GOG library</h2>
-        <p>Read from your browser's GOG login. Make sure you are signed in at <a href="https://www.gog.com" target="_blank" rel="noopener">gog.com</a> in Firefox. GOG has no public library API, so there is nothing else to configure.</p>
-      </section>
-
-      <section class="card">
-        <h2>Matching</h2>
-        <p>Games are matched across stores through <a href="https://isthereanydeal.com" target="_blank" rel="noopener">IsThereAnyDeal</a>'s ID database. An API key is optional — lookups currently work without one — but you can add one from <a href="https://isthereanydeal.com/apps/my/" target="_blank" rel="noopener">isthereanydeal.com/apps/my</a>.</p>
-        <p class="note">Keys you enter here are kept in this extension's local storage in Firefox, unencrypted, and are only ever sent to the service they belong to. Blank a field and save to forget a key.</p>
-        <label>IsThereAnyDeal API key (optional)
-          <input type="password" name="itadApiKey" autocomplete="off" spellcheck="false" placeholder="leave blank to use anonymous lookups">
-        </label>
-        <label class="check"><input type="checkbox" name="matchByTitle"> <span><strong>Also match by title</strong> — catches editions the database keeps separate (e.g. owning <em>The Witcher 3</em> on Steam badges the <em>Complete Edition</em> on GOG). Title matches get a dashed ring.</span></label>
-      </section>
-
-      <section class="card">
-        <h2>Refresh &amp; appearance</h2>
-        <div class="grid">
-          <label>Re-read libraries every
-            <span class="inline"><input type="number" name="refreshHours" min="1" max="168" step="1"> hours</span>
-          </label>
-          <label>GOG badge colour <input type="color" name="gogColor"></label>
-          <label>Steam badge colour <input type="color" name="steamColor"></label>
-        </div>
-      </section>
-
-      <div class="actions">
-        <button type="submit" class="primary">Save</button>
-        <button type="button" id="refresh">Save &amp; refresh now</button>
-        <button type="button" id="clear" class="danger">Clear cached data</button>
-        <span id="saved" class="saved" hidden>Saved</span>
+    <section class="card" aria-labelledby="statusHeading">
+      <div class="card__head">
+        <h2 id="statusHeading">Status</h2>
+        <button type="button" id="refresh" class="primary">Refresh now</button>
       </div>
-    </form>
-
-    <section class="card">
-      <h2>Status</h2>
+      <div class="tiles">
+        <div class="tile" id="tileSteam"><span class="tile__label"><span class="chip steam" aria-hidden="true">S</span> Steam</span><span class="tile__value">—</span><span class="tile__meta"></span></div>
+        <div class="tile" id="tileGog"><span class="tile__label"><span class="chip gog" aria-hidden="true">G</span> GOG</span><span class="tile__value">—</span><span class="tile__meta"></span></div>
+        <div class="tile" id="tileBoth"><span class="tile__label">On both stores</span><span class="tile__value">—</span><span class="tile__meta"><a href="#both">see the list</a></span></div>
+      </div>
+      <div id="progress" class="progress" hidden aria-live="polite">
+        <div class="progress__label" id="progressLabel"></div>
+        <div class="progress__bar" role="progressbar" aria-labelledby="progressLabel" id="progressBar"><div class="progress__fill" id="progressFill"></div></div>
+      </div>
       <dl id="status" class="status"></dl>
       <ul id="messages" class="messages"></ul>
     </section>
+
+    <form id="form" novalidate>
+      <section class="card" aria-labelledby="steamHeading">
+        <h2 id="steamHeading">Steam library</h2>
+        <label class="radio"><input type="radio" name="steamMethod" value="session"> <span><strong>Use my browser's Steam login</strong> (recommended) — nothing to set up; just be logged in to <a href="https://store.steampowered.com" target="_blank" rel="noopener">store.steampowered.com</a> in Firefox.</span></label>
+        <label class="radio"><input type="radio" name="steamMethod" value="api"> <span><strong>Use the Steam Web API</strong> — works without being logged in. Needs a key and your SteamID64, and "Game details" set to Public in your <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener">Steam privacy settings</a>.</span></label>
+        <div class="grid" id="apiFields">
+          <label>Steam Web API key <a class="hint" href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">get one</a>
+            <input type="password" name="steamApiKey" autocomplete="new-password" spellcheck="false" placeholder="32-character key" aria-describedby="steamApiKeyMsg">
+            <span id="steamApiKeyMsg" class="field-msg" aria-live="polite"></span>
+          </label>
+          <label>SteamID64 or profile link <a class="hint" href="https://steamcommunity.com/my/" target="_blank" rel="noopener">your profile</a>
+            <input type="text" name="steamId64" autocomplete="off" spellcheck="false" placeholder="7656119… or steamcommunity.com/id/…" aria-describedby="steamIdMsg">
+            <span id="steamIdMsg" class="field-msg" aria-live="polite"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="gogHeading">
+        <h2 id="gogHeading">GOG library</h2>
+        <p>Read from your browser's GOG login. Make sure you are signed in at <a href="https://www.gog.com" target="_blank" rel="noopener">gog.com</a> in Firefox. GOG has no public library API, so there is nothing else to set up.</p>
+      </section>
+
+      <section class="card" aria-labelledby="matchHeading">
+        <h2 id="matchHeading">Matching</h2>
+        <p>Games are matched across stores through <a href="https://isthereanydeal.com" target="_blank" rel="noopener">IsThereAnyDeal</a>'s ID database. An API key is optional — lookups currently work without one — but you can add one from <a href="https://isthereanydeal.com/apps/my/" target="_blank" rel="noopener">isthereanydeal.com/apps/my</a>.</p>
+        <p class="note">Keys you enter here are kept in this extension's local storage in Firefox, unencrypted, and are only ever sent to the service they belong to. Empty a field to forget a key.</p>
+        <label>IsThereAnyDeal API key (optional)
+          <input type="password" name="itadApiKey" autocomplete="new-password" spellcheck="false" placeholder="leave empty for anonymous lookups">
+        </label>
+        <label class="check"><input type="checkbox" name="matchByTitle"> <span><strong>Also match by title</strong> — catches editions the database keeps separate (owning <em>The Witcher 3</em> on Steam badges the <em>Complete Edition</em> on GOG). Title matches get a dashed ring.</span></label>
+      </section>
+
+      <section class="card" aria-labelledby="badgeHeading">
+        <h2 id="badgeHeading">Badges</h2>
+        <div class="badge-settings">
+          <div>
+            <label class="check"><input type="checkbox" name="showOnSteam"> <span>Show <strong>GOG</strong> badges on Steam</span></label>
+            <label class="check"><input type="checkbox" name="showOnGog"> <span>Show <strong>Steam</strong> badges on GOG</span></label>
+            <label class="check"><input type="checkbox" name="toolbarCount"> <span>Show the number of badged games on the toolbar icon</span></label>
+            <fieldset class="inline-choice">
+              <legend>Badge text</legend>
+              <label class="radio"><input type="radio" name="badgeText" value="letter"> <span>Letter (G / S)</span></label>
+              <label class="radio"><input type="radio" name="badgeText" value="name"> <span>Store name (GOG / Steam)</span></label>
+            </fieldset>
+            <div class="colors">
+              <label>GOG badge colour <input type="color" name="gogColor"></label>
+              <label>Steam badge colour <input type="color" name="steamColor"></label>
+              <button type="button" id="resetColors" class="small">Default colours</button>
+            </div>
+          </div>
+          <figure class="preview" aria-label="Preview">
+            <div class="preview__tile preview__tile--steam">
+              <span class="preview__cover"><span class="pv-badge pv-gog" data-letter="G" data-name="GOG">G</span></span>
+              <span class="preview__caption">On Steam</span>
+            </div>
+            <div class="preview__tile preview__tile--gog">
+              <span class="preview__cover"><span class="pv-badge pv-steam pv-right" data-letter="S" data-name="Steam">S</span></span>
+              <span class="preview__caption">On GOG</span>
+            </div>
+            <div class="preview__tile preview__tile--steam">
+              <span class="preview__cover"><span class="pv-badge pv-gog pv-fuzzy" data-letter="G" data-name="GOG">G</span></span>
+              <span class="preview__caption">Title match</span>
+            </div>
+            <figcaption class="muted">Preview</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="refreshHeading">
+        <h2 id="refreshHeading">Refresh</h2>
+        <label>Re-read both libraries every
+          <span class="inline"><input type="number" name="refreshHours" min="1" max="168" step="1"> hours</span>
+        </label>
+        <p class="note">Also on Firefox start-up and whenever you click <strong>Refresh now</strong>. Only new games are looked up again, so a refresh is quick after the first one.</p>
+      </section>
+    </form>
+
+    <section class="card" id="both" aria-labelledby="bothHeading">
+      <div class="card__head">
+        <h2 id="bothHeading">Owned on both stores <span id="bothCount" class="muted"></span></h2>
+        <input type="search" id="bothFilter" placeholder="Filter" aria-label="Filter the list" autocomplete="off">
+      </div>
+      <p id="bothNote" class="note"></p>
+      <ul id="bothList" class="both-list"></ul>
+      <button type="button" id="bothMore" class="small" hidden></button>
+    </section>
+
+    <section class="card" aria-labelledby="hiddenHeading">
+      <h2 id="hiddenHeading">Hidden badges</h2>
+      <p id="hiddenText">No badges are hidden.</p>
+      <p class="note">To hide a wrong match, open the toolbar popup on that store page and click <strong>Hide</strong> next to the game.</p>
+      <button type="button" id="unhideAll" class="small" disabled>Show all hidden badges again</button>
+    </section>
+
+    <section class="card" aria-labelledby="dataHeading">
+      <h2 id="dataHeading">Stored data</h2>
+      <p>Your two libraries, the IsThereAnyDeal answers and the match tables are kept in Firefox so badges show at once. Clearing them keeps your settings, keys and hidden badges; the next refresh reads everything again.</p>
+      <button type="button" id="clear" class="danger">Clear cached data</button>
+    </section>
   </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>Saved</div>
   <script src="../lib/common.js"></script>
   <script src="options.js"></script>
 </body>

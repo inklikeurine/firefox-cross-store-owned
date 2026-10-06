@@ -1,10 +1,8 @@
 # Cross-Store Owned — learnings
 
-Everything discovered while researching, building, and testing the extension on 2026-09-21, when it was still
-prototyped under the working name "Double Dip"; its code prefix was already `CSO`, "cross-store owned", which
-became the name. Written so the
-next person (or the next session) doesn't have to rediscover it. Companion to the [README](../README.md), which
-covers usage, and [architecture.md](./architecture.md), which describes the code as it is now.
+The research behind the extension: prior art, the endpoints and their quirks, store markup, and the design
+decisions worth remembering, so the next person doesn't have to rediscover them. Companion to the
+[README](../README.md), which covers usage, and [architecture.md](./architecture.md), which describes the code.
 
 ## 1. Prior art — nothing did both directions
 
@@ -84,6 +82,12 @@ library reads, the reverse direction, editions, `n/m`) is new.
 - Tiles nest: the same appid can appear on a wrapper and its child. Processing in document order and skipping
   any element whose nearest badged ancestor has the same key avoids double badges.
 - Hidden tab rows (`.tab_row_item`, width 0) still get badges; harmless, they show when the tab opens.
+- Header: logged in, the account menu is `#account_pulldown`; logged out, there is an
+  `a.global_action_link` to `/login`. Augmented Steam reads the same element. The adapter uses it only as a
+  hint (a fresh login after a failed read triggers one retry), never as proof.
+- Newer React pages (the 2024 wishlist, some hubs) render capsules as plain `<a href="/app/<id>/…"><img>`
+  without `data-ds-*`; the adapter's link fallback badges those image links and ignores text links, so a
+  page's prose links to games stay clean.
 - Page CSP: `connect-src` and `script-src` are locked down (no localhost, no inline `<script src>` from elsewhere),
   but `eval` from a devtools context works. Extension content scripts are not subject to page CSP.
 
@@ -120,8 +124,17 @@ library reads, the reverse direction, editions, `n/m`) is new.
   Content scripts can read `storage.local` and subscribe to `storage.onChanged`, which is simpler than messaging
   the whole map to every tab: the background writes `maps` once, every open store tab re-badges itself.
 - MV3 extension pages forbid inline scripts — all page logic lives in external `.js` files.
-- `strict_min_version` was 128 in the prototype (first release with `optional_host_permissions`, safely past the
-  127 change); it is 140 now, the floor for every extension in this repository.
+- `strict_min_version` is 140, the floor for every extension in this repository; anything from 128 (the first
+  release with `optional_host_permissions`, past the 127 host-permission change) would work.
+- **Toolbar badge per tab** (`action.setBadgeText({ tabId })`) is reset by Firefox when the tab navigates, and a
+  `null` text hands the tab back to the global text ("" would show nothing instead). Neither needs a permission.
+- **`tabs.sendMessage` needs no `tabs` permission**, so the popup can ask the active tab's content script for its
+  matches; on a page without one it rejects, which the popup treats as "not a store page".
+- **A content-script file may run twice in one world** (re-injection); top-level `const`/`let` then throws on the
+  second run, `var` and `function` do not.
+- **`autocomplete` on a password input**: Firefox's `input.autocomplete` property does not return the attribute
+  value; read it with `getAttribute`. `autocomplete="new-password"` keeps the login manager from offering to save
+  a key typed on an extension page.
 
 ## 5. Design decisions worth remembering
 
@@ -147,36 +160,48 @@ library reads, the reverse direction, editions, `n/m`) is new.
 - **Caching**: every ITAD answer is cached with a timestamp; `null` answers are re-asked after 7 days (games get
   added to ITAD). Second refresh of an unchanged library makes **zero** ITAD calls.
 - **Refresh hygiene**: one in-flight refresh at a time; a `refreshing` flag older than 15 min is treated as
-  abandoned (event page may have been unloaded); after a failed refresh, page loads don't retry for 10 min.
-- **Errors are per store.** If Steam fails and GOG works, the previous Steam library is reused and maps are still
-  rebuilt; the popup shows the Steam error.
+  abandoned (event page may have been unloaded) and one found at startup is cleared; after a failed refresh,
+  page loads don't retry for 10 min — except one immediate retry when a Steam page shows the user logged in
+  after a Steam login failure. The ITAD cache is saved even when a later lookup fails.
+- **Errors are per store**, and a logged-out store is a *login* problem the UI can act on (a **Log in** button)
+  rather than an error string. If Steam fails and GOG works, the previous Steam library is reused and maps are
+  still rebuilt.
+- **Title indexes are always built**; "Also match by title" is applied where badges are drawn, so switching it
+  needs no refresh.
+- **Owned on both** is a union-find over the ID links (so every edition of one game is one entry), then a title
+  layer for owned GOG products no link covered. Search folds titles like the normaliser but keeps edition words,
+  so "complete edition" finds the Complete Edition.
+- **Hiding is by tile IDs on the page's store** (`steam:app/55`), not by match: a hidden Steam app stays hidden
+  whichever GOG product it matched, and the page pill and every tile of that app go together.
+- **Elements get re-used by the stores' front-ends** (React rows, Angular attributes): the engine remembers which
+  IDs it looked at per element and redoes the element when they change.
 
-## 6. How it was tested without a real Firefox
+## 6. Testing notes
 
-No Node on the machine, and the extension couldn't be loaded into the built-in (Chromium) browser pane. What worked:
+How the extension is tested is in [development.md](./development.md); the facts below are what makes testing it
+awkward and are worth knowing before trying something new.
 
-- **Content scripts**: inject the concatenated sources into the live store page with a mocked
-  `window.browser` (`storage.local.get` returning fake `maps`, `runtime.sendMessage` recording calls), inject the
-  CSS via a `<style>`, then assert on `.cso-badge` elements via DOM queries. Verified on Steam search, front page,
-  app page, bundle page and on GOG catalog + game page.
-- **Same-origin navigation trick**: stash the source in `sessionStorage` to reuse it across pages on the same
-  origin without re-pasting 12 KB (it does not survive a cross-origin navigation; `window.name` doesn't either).
-- **Background logic**: fetch the files from a local static server on a neutral origin, `new Function(src)` for a
-  syntax check, then run `buildMaps()` for real with a fake 3+3-game library. ITAD calls went through a tiny local
-  proxy (Python) because the API has no CORS headers — and the proxy needed a browser `User-Agent` for Cloudflare.
-- **Gotchas hit along the way**: port 8765 was already in use by another local Python service (returned a JSON
-  404 — confusing); a quick-and-dirty comment stripper (`/\*.*?\*/`) ate the `/*` inside `"https://…/*"` host
-  permission strings; Steam's CSP blocks both `fetch()` and `<script src>` to localhost so sources had to be
-  pasted inline; screenshots of the heavy store pages regularly timed out — DOM assertions were more reliable.
-- **Still untested**: the whole thing running inside an actual Firefox profile with real logged-in sessions
-  (cookie-bearing background fetches, the options page's `permissions.request`, alarms).
+- **Store pages cannot load local test code.** Steam's CSP blocks both `fetch()` and `<script src>` to
+  localhost, so a script pasted into a live store page has to be inline. Extension content scripts are not subject
+  to the page CSP.
+- **IsThereAnyDeal has no CORS headers** and its Cloudflare front rejects non-browser user agents (Python
+  `urllib` → `Error code: 1010`); `curl`, browsers and extension background pages are fine.
+- **Headless Firefox gets HTTP 403 from www.gog.com** (Cloudflare) and an empty library from Steam when logged
+  out, so the live check's install-time refresh always fails per store — useful, as it exercises the error
+  path and the toolbar "!".
+- **Heavy store pages time out screenshots**; DOM assertions are more reliable than pixels.
+- A naive comment stripper (`/\*.*?\*/`) eats the `/*` inside `"https://…/*"` host-permission strings.
+- **Only a real profile proves** the cookie-bearing background fetches against logged-in sessions, the options
+  page's `permissions.request`, and the alarm firing on schedule.
 
 ## 7. Ideas not done
 
 - Epic / Humble / itch support — the adapter pattern (`collect / matchKey / matchTitle / describe`) was designed
   for it; ITAD has shop IDs for all of them, but Epic has no library endpoint (would need a bookmarklet or
   Legendary-style login).
-- Steam's React wishlist page wasn't inspected for `data-ds-appid`.
+- Steam's React wishlist page is covered by the image-link fallback without its markup having been inspected;
+  a dedicated selector may badge more of it.
+- Login detection on GOG pages (only Steam's header is read today).
 - Image-only Steam capsules with empty `alt` get no title, so they only match by ID.
 - A "hide DLC badges" toggle was considered and dropped: neither library API reliably flags DLC, so it would have
   been a content-side guess.

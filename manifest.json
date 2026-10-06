@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cross-Store Owned",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Badges games on Steam that you already own on GOG, and games on GOG that you already own on Steam",
   "browser_specific_settings": {
     "gecko": {

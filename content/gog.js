@@ -48,6 +48,7 @@
   }
 
   CSO.startBadges({
+    site: "gog",
     badgeClass: "steam",
     badgeLetter: "S",
     otherLabel: "Steam",
@@ -63,11 +64,10 @@
     describe(maps, steamKey) {
       const [kind, id] = String(steamKey).split("/");
       const name = maps.forGog.steamNames && maps.forGog.steamNames[id];
-      return { title: name || (kind === "sub" ? `Steam package ${id}` : ""), url: `https://store.steampowered.com/${kind}/${id}/` };
+      return { title: name || (kind === "sub" ? `Steam package ${id}` : ""), url: CSO.steamUrl(steamKey) };
     },
     fallbackUrl(steamKey) {
-      const [kind, id] = String(steamKey).split("/");
-      return `https://store.steampowered.com/${kind}/${id}/`;
+      return CSO.steamUrl(steamKey);
     }
   });
 })();

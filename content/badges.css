@@ -69,6 +69,23 @@
   filter: brightness(1.15);
 }
 
+/* Keyboard focus: a white-and-dark ring that reads on light and dark store pages alike. */
+.cso-badge:focus-visible {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #111;
+}
+
+/* "GOG" / "Steam" instead of a single letter (Settings → Badge text). */
+.cso-badge--name .cso-badge__letter {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+@media print {
+  .cso-badge {
+    display: none !important;
+  }
+}
+
 .cso-badge__letter {
   font-weight: 800;
 }
