@@ -1,7 +1,6 @@
 # Cross-Store Owned — product spec
 
-**Status:** implemented, v0.3.0. Validated and Automated Test; Manual Review
-of this version is pending (see the journal's click-list).
+**Status:** implemented, v0.3.0. Validated, Automated Test and Manual Review.
 
 ## About
 
