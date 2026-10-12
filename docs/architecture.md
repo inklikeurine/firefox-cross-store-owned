@@ -5,14 +5,15 @@ Manifest V3, Firefox 140+. No build step; every file is loaded as-is.
 ```text
 manifest.json
 lib/common.js         CSO namespace: settings + credentials defaults and validation, host origins,
-                      hidden-badge helpers, title normaliser, formatting helpers
+                      hidden-badge helpers, store-icon helpers, status-message filter,
+                      title normaliser, formatting helpers
 background.js         MV3 event page: library reads, IsThereAnyDeal lookups, map and owned-on-both
-                      building, search, toolbar badge, refresh alarm, messages
+                      building, store icons, search, toolbar badge, refresh alarm, messages
 content/badges.js     store-agnostic badge engine (matching, placement, MutationObserver,
                       "On this page" answer, toolbar count report)
 content/steam.js      Steam adapter for badges.js
 content/gog.js        GOG adapter for badges.js
-content/badges.css    badge styles; colours through --cso-gog / --cso-steam
+content/badges.css    badge styles (one look for both stores; corner tag, inline, game-page)
 popup/                toolbar popup: store cards, progress, On this page, Do I own…?, Refresh now
 options/              options page (opens in a tab): status, settings (autosaved), owned on both
 icons/icon.svg
@@ -70,8 +71,13 @@ a persistent page.
    maximum) with a 250 ms pause between them; HTTP 429 honours `Retry-After`
    up to three times. It then builds the title indexes and the owned-on-both
    list (`findOwnedOnBoth`: union-find over the ID links, then a title layer).
-4. The content script reads `maps`, `settings` and `hidden` once on load,
-   then subscribes to `storage.onChanged`; a new value of any of the three
+4. After the final status write, `refreshIcons` fetches each store's
+   `/favicon.ico` (no cookies) when it is missing or a month old, and
+   decodes it on the background page (`createImageBitmap` → canvas) to
+   32×32 RGBA pixels plus a PNG `data:` URL. A store that cannot be reached
+   keeps its old icon; with none, badges show the store's letter.
+5. The content script reads `maps`, `settings`, `hidden` and `icons` once on
+   load, then subscribes to `storage.onChanged`; a new value of any of them
    clears and redraws every badge on the page.
 
 ## Storage layout (`storage.local`)
@@ -81,6 +87,8 @@ a persistent page.
 | `settings` | see [spec.md](./spec.md) → Settings; non-secret, read by content scripts too | options page (popup: the per-store switch) |
 | `credentials` | `{ steamApiKey, steamId64, itadApiKey }` — background and options page only, never content scripts; unencrypted | options page (migrated from 0.1 `settings` by the background) |
 | `hidden` | `["steam:app/55", "gog:2000", …]` — badges the user hid | popup, options page |
+| `hiddenNames` | `{ "<hidden id>": "game name" }` for the options page's list; badges hidden before 0.4 have no entry and are described from the id | popup (on Hide), options page |
+| `icons` | `{ steam?, gog?: { size: 32, rgba: base64 of size×size×4 bytes, png: "data:image/png;base64,…", fetchedAt } }` | background |
 | `lib_steam` | `{ apps: number[], subs: number[], names: {appid: name}, steamId, method: "session"\|"api", fetchedAt, warning }` | background |
 | `lib_gog` | `{ ids: number[], info: {gogId: {title, url}}, fetchedAt, warning }` | background |
 | `itad_cache` | `{ steamToItad, gogToItad, itadToSteam, itadToGog }`, each `{ key: { v, t } }` | background |
@@ -139,7 +147,7 @@ through `storage.onChanged`.
   title says which. Set at the start and end of every refresh, on boot and by
   `clearCache`.
 - Per-tab text (`setPageCount`): the content script's count of badged games
-  (hidden ones excluded), in the other store's badge colour, `"999+"` above
+  (hidden ones excluded), on one fixed dark colour (`CSO.TOOLBAR_COLOR`), `"999+"` above
   999. A count of 0 or `toolbarCount: false` sets `null`, which shows the
   global badge again. Firefox clears a tab's own text on navigation; the
   content script reports again whenever the count or `location.href`
@@ -153,8 +161,8 @@ no-op). The adapter supplies:
 
 | Member | Purpose |
 | --- | --- |
-| `site` | `"steam"` / `"gog"`: the store the page belongs to (settings switch, hidden ids, toolbar colour) |
-| `badgeClass`, `badgeLetter`, `otherLabel` | `"gog"`, `"G"`, `"GOG"` on Steam pages; `"steam"`, `"S"`, `"Steam"` on GOG |
+| `site` | `"steam"` / `"gog"`: the store the page belongs to (settings switch, hidden ids) |
+| `badgeClass`, `badgeLetter`, `otherLabel` | `"gog"`, `"G"`, `"GOG"` on Steam pages; `"steam"`, `"S"`, `"Steam"` on GOG. `badgeClass` also names the store whose icon the badge shows; `badgeLetter` is the fallback when there is none |
 | `attributes` | attribute names to watch for late-rendered or changed IDs (GOG's Angular `{{ }}` placeholders; `href` for Steam's link fallback) |
 | `collect(root)` | returns `{ el, keys, altKeys?, title?, label?, container?, mode?, anchor?, corner?, expanded? }` per tile; `title` is matched by name, `label` is what the popup shows |
 | `matchKey(maps, key)` / `matchTitle(maps, title)` | the two match layers |
@@ -172,14 +180,23 @@ holds what `getPageMatches` and the toolbar count report, pruned of elements
 that left the page. A tile whose `<site>:<IDs>` is in `hidden` is recorded
 there but gets no badge.
 
-Placement: `mode: "after"` puts an expanded pill after a page title; `"inline"`
-prepends into the element; otherwise the engine overlays the badge on the
-tile's cover (`position: relative` is added only when the container is
-`static`). The badge is a `<span role="link" tabindex="0">` with an
-`aria-label`, not an `<a>`, because tiles are usually anchors; its click,
-middle-click and Enter/Space handlers stop propagation and open the other
-store in a new tab. Title matches carry a dashed ring and a second tooltip
-line saying so.
+Placement: `mode: "after"` puts the larger game-page badge (words always,
+plus an SVG arrow) after a page title; `"inline"` prepends a round badge into
+the element; otherwise the badge is a tag merged into the cover's corner
+(`cso-badge--corner`, `cso-tl` / `cso-tr`; `position: relative` is added only
+when the container is `static`). The badge is a `<span role="link"
+tabindex="0">` with an `aria-label`, not an `<a>`, because tiles are usually
+anchors; its click, middle-click and Enter/Space handlers stop propagation
+and open the other store in a new tab.
+
+Look: a dark badge with a white ring, the other store's favicon in a white
+disc and "Owned on …"; a title match (`cso-badge--maybe`) is white with a
+dark ring and reads "Maybe owned on …", with a second tooltip line saying it
+matched by name; `settings.badgeLabel: "icon"` drops the words
+(`cso-badge--icon-only`; bundles keep `n/m`). The favicon is drawn on a
+`<canvas>` with `putImageData` from the stored pixels rather than loaded as
+an image: Firefox applies the page's Content Security Policy to most DOM a
+content script inserts, and a `<canvas>` loads nothing.
 
 The Steam adapter's link fallback badges `a[href*="/app/"]` /
 `a[href*="/sub/"]` links to `store.steampowered.com` that contain an image

@@ -11,14 +11,16 @@ on the *other* store — so you see it before you click "Add to cart".
 
 ## What it does
 
-- On **store.steampowered.com**: a purple **G** on games you own on GOG.
-- On **www.gog.com**: a blue **S** on games you own on Steam.
+- On **store.steampowered.com**: an **Owned on GOG** badge, with GOG's own
+  icon, on games you own on GOG.
+- On **www.gog.com**: an **Owned on Steam** badge, with Steam's icon, on games
+  you own on Steam. Both stores' badges look the same.
 - Badges appear on every tile, row and page: search results, the front page,
-  sale pages, wishlists, DLC lists and the game's own page. Clicking a badge
-  (or focusing it and pressing Enter) opens the game on the other store in a
-  new tab; hovering shows the matched title.
-- Steam bundles and packages get a count: **G 2/5** means you own 2 of its
-  5 apps on GOG.
+  sale pages, wishlists, DLC lists and the game's own page. On a cover image
+  the badge sits in the corner like a tag. Clicking a badge (or focusing it
+  and pressing Enter) opens the game on the other store in a new tab;
+  hovering shows the matched title.
+- Steam bundles and packages say how much you have: **Own 2 of 5 on GOG**.
 - The **toolbar icon** shows how many games on the current store page you
   own on the other store. A red **!** on it means the last library read had a
   problem; **…** means a read is running.
@@ -32,9 +34,9 @@ on the *other* store — so you see it before you click "Add to cart".
 
 | Badge | Meaning |
 | --- | --- |
-| `G` / `S` | Exact match through IsThereAnyDeal's cross-store ID database |
-| `G` / `S` with a dashed ring | Title match — same normalised name, edition words ignored (you own the base game, this tile is the *Complete Edition*) |
-| `G 2/5` | Steam bundle or package: you own 2 of its 5 apps on GOG |
+| **Owned on GOG** (dark) | Exact match through IsThereAnyDeal's cross-store ID database |
+| **Maybe owned on GOG** (white) | Title match — same name once edition words are ignored (you own the base game, this tile is the *Game of the Year Edition*). Usually right, but two different games can share a name |
+| **Own 2 of 5 on GOG** | Steam bundle or package: you own 2 of its 5 apps on GOG |
 
 ## Installation
 
@@ -57,7 +59,8 @@ Source: https://github.com/inklikeurine/firefox-extensions/tree/main/cross-store
 ## Usage
 
 1. Log in to both `store.steampowered.com` and `www.gog.com` in Firefox.
-2. Click the toolbar icon → **Refresh now**. The first run looks up your whole
+2. Click the toolbar icon → **Refresh now** (the popup walks you through
+   these two steps the first time). The first run looks up your whole
    library on IsThereAnyDeal (a progress bar shows how far it is — a few
    seconds per thousand games); after that only new games are looked up and
    the libraries are re-read every 6 hours.
@@ -66,41 +69,49 @@ Source: https://github.com/inklikeurine/firefox-extensions/tree/main/cross-store
 
 ### The toolbar popup
 
-- **Steam / GOG cards** — how many items each library holds and when it was
-  read. A card that says *Not logged in* has a **Log in** button; log in,
-  then click **Refresh now** (or just open a Steam page — a fresh login there
-  is noticed and the read retried).
+- **Steam / GOG cards** — how many items each library holds, with a ✓ when
+  the last read worked. A card that says *Logged out* has a **Log in**
+  button; log in, then click **Refresh now** (or just open a Steam page — a
+  fresh login there is noticed and the read retried).
 - **You own N games on both stores →** opens the full list in Settings.
-- **On this page** (on a Steam or GOG page) — each badged game, with its
-  badge letter (click it to open the other store) and **Hide**. Hide a badge
-  when a title match is wrong; it disappears from every page and the popup
-  keeps it listed with **Show** to bring it back.
+- **On this page** (on a Steam or GOG page) — the badged games, five at a
+  time (**Show all** for the rest), each with its badge (click it to open
+  the other store) and **Hide**. Hide a badge when a title match is wrong;
+  it disappears from every page and the popup keeps it listed, faded, with
+  **Show** to bring it back. While you search, this list folds away so the
+  results fit.
 - **Do I own…?** — type part of a name to search both libraries. Each result
-  shows **S** and/or **G** for where you own it; click one to open that store
-  page.
+  shows the Steam and/or GOG badge for where you own it; click one to open
+  that store page. It appears once both libraries have been read.
 
 ### Settings
 
 Toolbar popup → the sliders button, or `about:addons` → Cross-Store Owned →
 Preferences. Changes save as you make them.
 
-- **Status** — counts, the last read, any problem, **Refresh now**.
-- **Steam library** — *Use my browser's Steam login* (default) reads your
-  owned apps, DLC and packages from the store with your cookies, and the
-  store's own session token to fetch game names for title matching and
-  search. *Use the Steam Web API* instead takes a
-  [Steam Web API key](https://steamcommunity.com/dev/apikey) and your
-  SteamID64 and works without being logged in to the store; it needs
-  "Game details" set to **Public** in your Steam privacy settings. The
-  SteamID64 field also takes a profile link
-  (`steamcommunity.com/profiles/…`, or `steamcommunity.com/id/<name>` once the
-  key is filled in).
-- **GOG library** — always read from your browser's GOG login. GOG has no
-  public library API, so there is nothing to configure.
-- **IsThereAnyDeal API key** — optional. The lookup endpoints answer
-  anonymous requests today; add a key from
-  [isthereanydeal.com/apps/my](https://isthereanydeal.com/apps/my/) if that
-  changes.
+- **Status** — counts, the last read, any problem (said once, on the store's
+  tile), **Refresh now**, and **Details** with the exact numbers.
+- **Badges** — show or hide the badges on each store separately; the badge
+  as **Icon and words** or **Icon only** (for small tiles); the toolbar count
+  on or off; a live preview.
+- **Libraries**
+  - *Steam*: *Use my browser's Steam login* (default) reads your owned apps,
+    DLC and packages from the store with your cookies, and the store's own
+    session token to fetch game names for title matching and search. *Use
+    the Steam Web API* instead takes a
+    [Steam Web API key](https://steamcommunity.com/dev/apikey) and your
+    SteamID64 and works without being logged in to the store; it needs "Game
+    details" set to **Public** in your Steam privacy settings. The SteamID64
+    field also takes a profile link (`steamcommunity.com/profiles/…`, or
+    `steamcommunity.com/id/<name>` once the key is filled in).
+  - *GOG*: always read from your browser's GOG login. GOG has no public
+    library API, so there is nothing to configure.
+  - *Matching*: **Also match by title** gives the "Maybe owned" badges
+    described above. Turn it off if you only want exact ID matches; it takes
+    effect at once. The optional **IsThereAnyDeal API key**: the lookup
+    endpoints answer anonymous requests today; add a key from
+    [isthereanydeal.com/apps/my](https://isthereanydeal.com/apps/my/) if
+    that changes.
 - **About keys.** Any key you enter is kept in this extension's local
   storage in your Firefox profile, **unencrypted** — an extension has nowhere
   to keep an encryption key that someone who can read your profile could not
@@ -109,29 +120,25 @@ Preferences. Changes save as you make them.
   to the service they belong to, are masked on the settings page, and never
   reach the store pages' content scripts. To forget a key, empty the field,
   or remove the extension (**Clear cached data** keeps settings and keys).
-- **Also match by title** — the dashed-ring fallback described above. Turn
-  it off if you only want exact ID matches; it takes effect at once.
-- **Badges** — show or hide the badges on each store separately; the badge
-  text (**G / S** or **GOG / Steam**); the toolbar count on or off; the two
-  badge colours, with a live preview and **Default colours**.
-- **Refresh** — how often both libraries are re-read (1–168 hours).
-- **Owned on both stores** — every game you own on both, editions grouped,
-  with links to each store page and a filter box.
-- **Hidden badges** — how many you have hidden, and **Show all hidden badges
-  again**.
-- **Clear cached data** — drops the libraries, matches and lookup cache.
-  Settings, keys and hidden badges are kept.
+- **Owned on both stores** — every game you own on both, with one Steam and
+  one GOG badge for the base game; other editions you own are named
+  underneath. A filter box narrows the list.
+- **Upkeep** — how often both libraries are re-read (a number of hours, days
+  or weeks, from 1 hour to 4 weeks); the badges you have hidden, each with
+  **Show**, and **Show all hidden badges again**; **Clear cached data**,
+  which drops the libraries, matches, lookup cache and store icons (settings,
+  keys and hidden badges are kept).
 
 ## Permissions
 
 | Permission | Why it's needed |
 | --- | --- |
-| `storage` | Keeps your settings, the two libraries, the IsThereAnyDeal lookup cache, the match tables the badges read, the owned-on-both list and the badges you hid. |
+| `storage` | Keeps your settings, the two libraries, the IsThereAnyDeal lookup cache, the match tables the badges read, the owned-on-both list, the two store icons and the badges you hid (with their names). |
 | `unlimitedStorage` | A library of several thousand games plus its lookup cache is a few megabytes; this keeps it from being evicted under Firefox's normal storage quota. Silent permission, no prompt. |
 | `alarms` | Schedules the periodic library refresh (default every 6 hours). |
-| `https://store.steampowered.com/*` | Reads your owned apps, DLC and packages from the store with your login (`/dynamicstore/userdata`), and the session token the store hands logged-in users. Also where the Steam badges are shown. |
+| `https://store.steampowered.com/*` | Reads your owned apps, DLC and packages from the store with your login (`/dynamicstore/userdata`), and the session token the store hands logged-in users; fetches Steam's icon for the badges. Also where the GOG badges are shown. |
 | `https://api.steampowered.com/*` | Fetches game names (`GetOwnedGames`) for title matching and search, with the session token or your own Web API key; turns a custom profile name into a SteamID64 (`ResolveVanityURL`, only when you type one in Settings). |
-| `https://www.gog.com/*` | Reads your owned product IDs and titles with your login (`/user/data/games`, `/account/getFilteredProducts`). Also where the GOG badges are shown. |
+| `https://www.gog.com/*` | Reads your owned product IDs and titles with your login (`/user/data/games`, `/account/getFilteredProducts`); fetches GOG's icon for the badges. Also where the Steam badges are shown. |
 | `https://embed.gog.com/*` | Fallback host for the same GOG library endpoints. |
 | `https://api.gog.com/*` | Looks up a store link for a GOG product the library listing did not cover (public endpoint, no login). |
 | `https://api.isthereanydeal.com/*` | Resolves Steam and GOG product IDs to IsThereAnyDeal game IDs and back, which is how the two libraries are matched. |
@@ -149,7 +156,8 @@ extension cannot work without sending something out of the browser: the
 `api.isthereanydeal.com` so they can be matched. No account name, SteamID,
 e-mail, cookie or browsing history goes with them, and nothing at all is sent
 to the extension's author or anyone else. The requests to Steam and GOG are
-the same ones the two sites make for you while you browse them logged in, and
+the same ones the two sites make for you while you browse them logged in
+(the two store icons are fetched without your cookies, about once a month), and
 your Steam Web API key (if you enter one) is sent only to
 `api.steampowered.com`. The **Do I own…?** search runs entirely inside
 Firefox. Everything the extension keeps — including any API key you enter,
@@ -180,6 +188,9 @@ deleted with the extension.
   games, and an interrupted one carries on where it stopped.
 - Store markup changes need selector updates in `content/steam.js` /
   `content/gog.js`.
+- The badges show each store's own icon, read from the store's site. If it
+  cannot be read (the store is unreachable, or it changes its icon file),
+  the badge shows the store's first letter instead until the next refresh.
 - Firefox on desktop only. Not tested on Firefox for Android.
 
 ## AI-generated

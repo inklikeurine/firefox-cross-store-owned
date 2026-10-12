@@ -1,23 +1,20 @@
-/* Cross-Store Owned badges. Colours come from --cso-gog / --cso-steam, set from the extension settings. */
-:root {
-  --cso-gog: #7b2fbe;
-  --cso-steam: #1a9fff;
-}
+/* Cross-Store Owned badges. One look on both stores: the other store's favicon and "Owned on …".
+ * A title match ("Maybe owned on …") is the light version of the same badge. */
 
 .cso-badge {
   all: initial;
   display: inline-flex !important;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   box-sizing: border-box;
-  height: 20px;
-  min-width: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  font: 700 12px/20px -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  height: 24px;
+  padding: 0 9px 0 3px;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  font: 600 12px/1 -apple-system, "Segoe UI", system-ui, sans-serif;
   color: #fff;
-  background: var(--cso-color, #666);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  background: #1d2229;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
   white-space: nowrap;
   vertical-align: middle;
@@ -25,73 +22,135 @@
   text-decoration: none;
 }
 
-.cso-badge--gog {
-  --cso-color: var(--cso-gog);
+/* Title match: white badge, dark ring and text. */
+.cso-badge--maybe {
+  color: #1d2229;
+  background: #fff;
+  border-color: #1d2229;
 }
 
-.cso-badge--steam {
-  --cso-color: var(--cso-steam);
+/* The favicon (or the store's letter) sits in a small white disc. */
+.cso-badge__icon {
+  all: initial;
+  display: inline-grid !important;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
 }
 
-.cso-badge--overlay {
+.cso-badge__favicon {
+  all: initial;
+  display: block !important;
+  width: 12px;
+  height: 12px;
+}
+
+.cso-badge__icon--letter {
+  font: 800 10px/16px -apple-system, "Segoe UI", system-ui, sans-serif;
+  color: #1d2229;
+  text-align: center;
+}
+
+.cso-badge__text,
+.cso-badge__count {
+  all: initial;
+  font: inherit;
+  color: inherit;
+}
+
+.cso-badge--icon-only {
+  padding: 0 3px;
+}
+
+.cso-badge--icon-only .cso-badge__count {
+  padding-right: 4px;
+}
+
+/* On a cover image: a tag merged into the tile's corner, ringed only on its two inner edges. */
+.cso-badge--corner {
   position: absolute;
-  top: 4px;
+  top: 0;
+  height: 26px;
+  padding: 0 10px 0 5px;
+  border-width: 0;
+  border-radius: 0;
 }
 
-.cso-badge--overlay.cso-tl {
-  left: 4px;
+.cso-badge--corner.cso-tl {
+  left: 0;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-bottom-right-radius: 9px;
 }
 
-.cso-badge--overlay.cso-tr {
-  right: 4px;
+.cso-badge--corner.cso-tr {
+  right: 0;
+  border-left-width: 2px;
+  border-bottom-width: 2px;
+  border-bottom-left-radius: 9px;
+}
+
+.cso-badge--corner.cso-badge--icon-only {
+  padding: 0 5px;
 }
 
 .cso-badge--inline {
   margin: 0 6px 0 0;
 }
 
+/* Under a game page's title: a larger badge that names the game and shows it opens elsewhere. */
 .cso-badge--expanded {
-  height: 26px;
-  line-height: 26px;
+  height: 30px;
   margin: 8px 0;
-  padding: 0 12px 0 8px;
-  border-radius: 13px;
+  padding: 0 11px 0 4px;
+  border-radius: 15px;
+  font-size: 13px;
 }
 
-/* Title-based (fuzzy) matches get a dashed ring so they read as "probably". */
-.cso-badge--fuzzy {
-  outline: 2px dashed rgba(255, 255, 255, 0.85);
-  outline-offset: -3px;
+.cso-badge--expanded .cso-badge__icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
 }
 
-.cso-badge:hover,
-.cso-badge:focus-visible {
-  filter: brightness(1.15);
+.cso-badge--expanded .cso-badge__favicon {
+  width: 16px;
+  height: 16px;
+}
+
+.cso-badge__arrow {
+  all: initial;
+  display: block !important;
+  color: inherit;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cso-badge:hover {
+  filter: brightness(1.2);
+}
+
+.cso-badge--maybe:hover {
+  filter: brightness(0.95);
 }
 
 /* Keyboard focus: a white-and-dark ring that reads on light and dark store pages alike. */
 .cso-badge:focus-visible {
+  outline: none;
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #111;
-}
-
-/* "GOG" / "Steam" instead of a single letter (Settings → Badge text). */
-.cso-badge--name .cso-badge__letter {
-  font-size: 11px;
-  letter-spacing: 0.02em;
 }
 
 @media print {
   .cso-badge {
     display: none !important;
   }
-}
-
-.cso-badge__letter {
-  font-weight: 800;
-}
-
-.cso-badge__count,
-.cso-badge__text {
-  font-weight: 600;
-  font-size: 11px;
 }

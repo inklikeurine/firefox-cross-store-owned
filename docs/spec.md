@@ -65,24 +65,40 @@
 - **Badges** (content scripts): find product tiles by the stores' own
   `data-*` attributes (and, on Steam, image links to `/app/N` / `/sub/N`
   outside any tile), look them up in the maps from `storage.local`, draw a
-  `<span role="link">` badge (overlay on covers, inline in lists, expanded
-  pill under page titles). Re-run on DOM mutations — including an element
-  reused for another game — and when `maps`, `settings` or `hidden` change.
-  Idempotent per document.
-- **Toolbar icon**: per-tab count of badged games (in the other store's badge
-  colour); globally "…" while a refresh runs and "!" after one with errors.
-- **Popup**: one card per store (count, age, problem, **Log in**), the
-  owned-on-both count (links to the list), a progress bar during a refresh,
-  remaining errors and warnings, **On this page** (badged games of the active
-  store tab, **Hide**/**Show**, a link to each), **Do I own…?** search, and
-  **Refresh now**; **Grant site access** when the host permissions are
-  missing; a getting-started line before the first successful read.
-- **Options page**: status (tiles, progress, details, **Refresh now**), Steam
-  method and credentials (SteamID64 from an ID, profile link or custom name),
-  IsThereAnyDeal key, title matching, per-store badge switches, badge text,
-  toolbar count, colours with live preview and reset, refresh interval, the
-  owned-on-both list with a filter, hidden-badge count and reset,
-  **Clear cached data**. Every change saves itself.
+  `<span role="link">` badge: the other store's favicon (drawn on a
+  `<canvas>` from stored pixels, so nothing is loaded into the store page;
+  the store's letter when there is no icon) and "Owned on GOG" / "Owned on
+  Steam" — "Maybe owned on …" for a title match, "Own 2 of 5 on …" for a
+  bundle; the same look on both stores. Placement: a tag merged into the
+  cover's corner (top-left on Steam; top-right on GOG, whose own release
+  label takes the top-left), inline in lists, a larger badge with an arrow
+  under page titles. Re-run on DOM mutations — including an element reused
+  for another game — and when `maps`, `settings`, `hidden` or `icons`
+  change. Idempotent per document.
+- **Store icons** (background): each store's `/favicon.ico`, fetched without
+  cookies after a refresh when missing or a month old, decoded on the
+  background page to 32×32 RGBA pixels and a PNG `data:` URL (`icons`).
+- **Toolbar icon**: per-tab count of badged games (one fixed dark colour);
+  globally "…" while a refresh runs and "!" after one with errors.
+- **Popup** (fits Firefox's 600 px popup height; the list area scrolls, the
+  footer stays): first run — three numbered steps (log in to Steam, log in to
+  GOG, **Refresh now**) instead of the store cards; then one card per store
+  (count and ✓, or the problem and **Log in**), the owned-on-both count
+  (links to the list), a progress bar during a refresh, remaining errors and
+  warnings in notice boxes, **On this page** (badged games of the active store
+  tab, five then **Show all**, **Hide**/**Show**, a link to each; folded to
+  its heading while a search is typed), **Do I own…?** search (once both
+  libraries are read), and **Refresh now**; **Grant site access** when the
+  host permissions are missing.
+- **Options page**, five cards: Status (tiles, progress, a store problem said
+  once on its tile, **Details** in plain words, **Refresh now**); Badges
+  (per-store switches, icon and words or icon only, toolbar count, live
+  preview); Libraries (Steam method and credentials — SteamID64 from an ID,
+  profile link or custom name — GOG, title matching, IsThereAnyDeal key);
+  Owned on both stores (one badge per store for the base game, other editions
+  named, a filter); Upkeep (refresh interval in hours, days or weeks, hidden
+  badges by name with **Show** each and **Show all**, **Clear cached data**).
+  Every change saves itself.
 
 ## Optional / future functionality
 
@@ -96,7 +112,7 @@
 ## Permissions
 
 - `storage` — settings, libraries, lookup cache, match tables, owned-on-both
-  list, hidden badges.
+  list, store icons, hidden badges and their names.
 - `unlimitedStorage` — the cache for a large library exceeds what Firefox
   guarantees under its normal IndexedDB quota; silent permission.
 - `alarms` — the periodic refresh.
@@ -127,22 +143,19 @@ store-agnostic badge engine driven by an adapter from `content/steam.js` or
 
 `storage.local`, key `settings`, one object, defaults applied on read
 (`CSO.withDefaults`: keys the defaults do not define are dropped, and a value
-of the wrong type, outside its allowed choices, or a colour that is not
-`#rrggbb` falls back to the default). Read by the background, the popup, the
+of the wrong type or outside its allowed choices falls back to the default). Read by the background, the popup, the
 options page **and the content scripts**, so nothing secret or personal is
 kept here:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `steamMethod` | `"session"` | `"session"` reads the store with cookies; `"api"` uses the Web API key + SteamID64 |
-| `refreshHours` | `6` | Refresh interval, clamped to 1–168 |
+| `refreshHours` | `6` | Refresh interval in hours, clamped to 1–672 (4 weeks); the options page shows it in hours, days or weeks |
 | `matchByTitle` | `true` | Draw title-match badges (and count title entries in "owned on both") |
 | `showOnSteam` | `true` | Draw GOG badges on Steam pages |
 | `showOnGog` | `true` | Draw Steam badges on GOG pages |
-| `badgeText` | `"letter"` | `"letter"` = G / S; `"name"` = GOG / Steam |
+| `badgeLabel` | `"words"` | `"words"` = store icon + "Owned on …"; `"icon"` = the icon alone (bundles keep their `n/m`; the game-page badge always has words) |
 | `toolbarCount` | `true` | Show the per-page count on the toolbar icon |
-| `gogColor` | `"#7b2fbe"` | Badge colour on Steam |
-| `steamColor` | `"#1a9fff"` | Badge colour on GOG |
 
 `storage.local`, key `credentials` (`CSO.withCredentialDefaults`). Read only
 by the background page and the options page; stored unencrypted (see the
@@ -182,7 +195,11 @@ Headless suites in `.dev/tests/cross-store-owned/`:
   live check's fixture pages: placement, counts, titles, the link fallback,
   reused tiles, clicks and keys, the "On this page" answer, the toolbar count
   report, hidden badges, every badge setting, corrupt maps, the login hint,
-  re-injection.
+  re-injection, the favicon drawn on a canvas.
+- `ui.test.mjs` — the popup and the options page in jsdom: first-run steps,
+  the five-row cap and folding while searching, hidden rows, problems said
+  once, refresh units, one badge per store in the owned-on-both list, the
+  hidden-badges list, the badge preview.
 
 The live check serves a Steam-shaped fixture at a `store.steampowered.com`
 URL, seeds `maps` and both libraries from the background, and checks the
@@ -194,36 +211,43 @@ for the GOG adapter.
 
 Manual checklist (the click-list in the verification report is written from this):
 
-- Load temporarily → toolbar icon appears; popup shows the getting-started
-  line, both cards "Not loaded", no errors.
+- Load temporarily → toolbar icon appears; popup shows the three first-run
+  steps, no search box, no errors.
 - Logged in to both stores → **Refresh now** → progress bar moves through
   Steam, GOG and the four matching steps; both cards show counts and a ✓; the
   "own N games on both stores" line is plausible.
-- Steam search for a game you own on GOG → purple **G** on its tile; hover
+- Steam search for a game you own on GOG → **Owned on GOG** badge with GOG's
+  icon on its row; hover
   shows the GOG title; click opens the GOG page in a new tab without
   navigating the Steam tile; the toolbar icon shows a number.
 - Popup on that page → **On this page** lists it; **Hide** removes the badge
-  from the page, **Show** brings it back.
-- GOG catalog page for a game you own on Steam → blue **S** top-right of the
-  cover; click opens the Steam page.
-- A game page on either store → expanded pill under the title.
-- A Steam sale page with a bundle → `G n/m` badge.
+  from the page and fades the row, **Show** brings it back; Settings →
+  Upkeep lists it by name while hidden.
+- GOG catalog page for a game you own on Steam → **Owned on Steam** tag merged
+  into the top-right corner of the cover; click opens the Steam page.
+- A game page on either store → the larger badge with an arrow under the
+  title.
+- A Steam sale page with a bundle → **Own n of m on GOG**.
+- A popup with more than five games on the page → **Show all**; type in
+  **Do I own…?** → the page list folds; the popup never needs to scroll as a
+  whole.
 - Steam wishlist → badges on owned games' capsules (the link fallback).
 - Popup → **Do I own…?** → type part of a game you own on one store → it is
-  listed with S or G.
-- Options → change a badge colour → open store tabs recolour without reload;
-  **Default colours** resets.
-- Options → badge text *Store name* → badges read GOG / Steam.
+  listed with the Steam and/or GOG badge.
+- Options → **Icon only** → open store tabs show the icon without words
+  (bundles keep `n/m`), without reload.
+- Options → refresh every 2 days → reopen Settings → still "2 days".
 - Options → untick *Show GOG badges on Steam* → Steam badges and the
   toolbar count go away.
-- Options → turn off title matching → dashed-ring badges disappear at once.
+- Options → turn off title matching → "Maybe owned" badges disappear at once.
 - Options → **Owned on both stores** → list is plausible; filter narrows it.
-- Options → **Clear cached data** → popup returns to "Not loaded"; settings,
-  keys and hidden badges unchanged.
+- Options → **Clear cached data** → popup returns to the first-run steps;
+  settings, keys and hidden badges unchanged; the next refresh brings the
+  store icons back.
 - Options → Web API method → paste a profile link in the SteamID64 field →
   it becomes the 17-digit ID.
-- Log out of GOG → **Refresh now** → GOG card "Not logged in to GOG" with
-  **Log in**, toolbar "!"; Steam-side badges still show from the last good
+- Log out of GOG → **Refresh now** → GOG card "Logged out · last list kept"
+  with **Log in**, toolbar "!"; Settings says it once, on the GOG tile; Steam-side badges still show from the last good
   GOG library.
 - Log out of Steam → refresh → log back in → open any Steam page → the
   libraries are read again without clicking anything.

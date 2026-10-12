@@ -6,6 +6,7 @@ const BOTH_PAGE = 150;
 
 let settings = CSO.withDefaults(null);
 let credentials = CSO.withCredentialDefaults(null);
+let icons = {};
 let bothGames = [];
 let bothShown = BOTH_PAGE;
 let toastTimer = 0;
@@ -40,37 +41,62 @@ function toast(text = "Saved") {
   toastTimer = setTimeout(() => { t.hidden = true; }, 1600);
 }
 
+// The badge as the store pages draw it: `store` is the store whose icon it shows.
+function badge(store, { maybe = false, iconOnly = false } = {}) {
+  const b = el("span", `pv-badge${maybe ? " maybe" : ""}${iconOnly ? " icon-only" : ""}`);
+  b.append(CSO.storeIcon(icons, store, 16));
+  if (!iconOnly) b.append(`${maybe ? "Maybe owned" : "Owned"} on ${CSO.STORES[store].label}`);
+  return b;
+}
+
+// The small badge used in lists, linking to the store page.
+function pill(store, href, label) {
+  const a = link("", href || CSO.STORES[store].home, "pill");
+  a.append(CSO.storeIcon(icons, store, 14));
+  a.title = label;
+  a.setAttribute("aria-label", label);
+  return a;
+}
+
 /* ---------------------------------------------------------------- the form */
 
 // The form feeds two storage keys: "settings" (read everywhere, including store pages)
 // and "credentials" (background and this page only). See lib/common.js.
+function refreshHoursFromFields() {
+  const value = Math.floor(Number($("refreshValue").value));
+  const unit = CSO.REFRESH_UNITS[$("refreshUnit").value] || 1;
+  return CSO.refreshHours({ refreshHours: Number.isFinite(value) ? value * unit : NaN });
+}
+
 function readSettings() {
   const data = new FormData(form);
   const checked = (name) => form.elements[name].checked;
   return CSO.withDefaults({
     steamMethod: data.get("steamMethod") === "api" ? "api" : "session",
-    refreshHours: CSO.refreshHours({ refreshHours: data.get("refreshHours") }),
+    refreshHours: refreshHoursFromFields(),
     matchByTitle: checked("matchByTitle"),
     showOnSteam: checked("showOnSteam"),
     showOnGog: checked("showOnGog"),
-    badgeText: data.get("badgeText") === "name" ? "name" : "letter",
-    toolbarCount: checked("toolbarCount"),
-    gogColor: String(data.get("gogColor") || ""),
-    steamColor: String(data.get("steamColor") || "")
+    badgeLabel: data.get("badgeLabel") === "icon" ? "icon" : "words",
+    toolbarCount: checked("toolbarCount")
   });
+}
+
+function fillRefresh(hours) {
+  const { value, unit } = CSO.splitHours(hours);
+  $("refreshValue").value = value;
+  $("refreshUnit").value = unit;
 }
 
 function fillSettings(s) {
   const f = form.elements;
   f.steamMethod.value = s.steamMethod;
-  f.refreshHours.value = s.refreshHours;
   f.matchByTitle.checked = s.matchByTitle;
   f.showOnSteam.checked = s.showOnSteam;
   f.showOnGog.checked = s.showOnGog;
-  f.badgeText.value = s.badgeText;
+  f.badgeLabel.value = s.badgeLabel;
   f.toolbarCount.checked = s.toolbarCount;
-  f.gogColor.value = s.gogColor;
-  f.steamColor.value = s.steamColor;
+  fillRefresh(s.refreshHours);
   toggleApiFields();
   updatePreview();
 }
@@ -88,20 +114,27 @@ function toggleApiFields() {
 
 function updatePreview() {
   const f = form.elements;
-  const root = document.documentElement.style;
-  root.setProperty("--pv-gog", f.gogColor.value);
-  root.setProperty("--pv-steam", f.steamColor.value);
-  const name = f.badgeText.value === "name";
-  for (const b of document.querySelectorAll(".pv-badge")) b.textContent = name ? b.dataset.name : b.dataset.letter;
+  const iconOnly = f.badgeLabel.value === "icon";
+  const put = (id, b) => {
+    const cover = $(id).querySelector(".preview__cover");
+    cover.textContent = "";
+    cover.append(b);
+  };
+  put("pvSteam", badge("gog", { iconOnly }));
+  put("pvGog", badge("steam", { iconOnly }));
+  put("pvMaybe", badge("gog", { iconOnly, maybe: true }));
   const preview = document.querySelector(".preview");
   preview.classList.toggle("off-steam", !f.showOnSteam.checked);
   preview.classList.toggle("off-gog", !f.showOnGog.checked);
-  document.querySelector(".pv-fuzzy").hidden = !f.matchByTitle.checked;
+  $("pvMaybe").hidden = !f.matchByTitle.checked;
+  const lead = $("leadBadge");
+  lead.textContent = "";
+  lead.append(badge("gog"));
 }
 
 async function saveSettings() {
   const next = readSettings();
-  form.elements.refreshHours.value = next.refreshHours;   // show the clamped value
+  fillRefresh(next.refreshHours);   // show the clamped value in its largest whole unit
   if (JSON.stringify(next) === JSON.stringify(settings)) return;
   settings = next;
   await browser.storage.local.set({ settings });
@@ -176,22 +209,13 @@ form.addEventListener("change", async (ev) => {
   }
 });
 
-// Live preview while a colour picker is open; the setting itself is saved on "change".
-form.addEventListener("input", (ev) => {
-  if (ev.target && ev.target.type === "color") updatePreview();
-});
-
 form.addEventListener("submit", (ev) => {
   ev.preventDefault();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 });
 
-$("resetColors").addEventListener("click", async () => {
-  form.elements.gogColor.value = CSO.DEFAULT_SETTINGS.gogColor;
-  form.elements.steamColor.value = CSO.DEFAULT_SETTINGS.steamColor;
-  updatePreview();
-  await saveSettings();
-});
+$("refreshValue").addEventListener("change", saveSettings);
+$("refreshUnit").addEventListener("change", saveSettings);
 
 /* ---------------------------------------------------------------- status */
 
@@ -201,7 +225,7 @@ function setTile(id, value, meta, error, loginUrl) {
   const m = tile.querySelector(".tile__meta");
   if (meta !== null) {
     m.textContent = meta;
-    if (loginUrl) m.append(el("br"), link("Log in", loginUrl, "login"));
+    if (loginUrl) m.append(" · ", link("Log in", loginUrl, "login"));
   }
   tile.classList.toggle("error", !!error);
 }
@@ -229,6 +253,14 @@ function renderProgress(status) {
   }
 }
 
+function renderTileIcons() {
+  for (const [id, store] of [["tileSteam", "steam"], ["tileGog", "gog"]]) {
+    const slot = $(id).querySelector(".tile__icon");
+    slot.textContent = "";
+    slot.append(CSO.storeIcon(icons, store, 16));
+  }
+}
+
 async function renderStatus() {
   let s;
   try {
@@ -243,42 +275,37 @@ async function renderStatus() {
   const problems = status.problems || {};
   $("permissions").hidden = s.permissionsGranted;
 
-  const storeMeta = (lib, problem, label) => {
-    if (problem) return problem.login ? `Not logged in to ${label}` : sentence(problem.message);
+  // A store's problem is said once, on its tile.
+  const storeMeta = (lib, problem) => {
+    if (problem) return problem.login ? "Logged out" : sentence(problem.message);
     return lib ? `read ${CSO.since(lib.fetchedAt)}` : "not read yet";
   };
   const login = (store) => (problems[store] && problems[store].login ? CSO.STORES[store].login : "");
-  setTile("tileSteam", s.steam ? CSO.formatCount(s.steam.apps + s.steam.subs) : "—", storeMeta(s.steam, problems.steam, "Steam"), problems.steam, login("steam"));
-  setTile("tileGog", s.gog ? CSO.formatCount(s.gog.ids) : "—", storeMeta(s.gog, problems.gog, "GOG"), problems.gog, login("gog"));
+  setTile("tileSteam", s.steam ? CSO.formatCount(s.steam.apps + s.steam.subs) : "—", storeMeta(s.steam, problems.steam), problems.steam, login("steam"));
+  setTile("tileGog", s.gog ? CSO.formatCount(s.gog.ids) : "—", storeMeta(s.gog, problems.gog), problems.gog, login("gog"));
   const st = s.maps && s.maps.stats;
   const both = st ? (Number(st.ownedOnBoth) || 0) + (settings.matchByTitle ? Number(st.ownedOnBothByTitle) || 0 : 0) : null;
   setTile("tileBoth", both === null ? "—" : CSO.formatCount(both), null, false);
+  renderTileIcons();
 
   const dl = $("status");
   dl.textContent = "";
   if (s.steam) {
-    const who = s.steam.steamId ? ` (SteamID ${s.steam.steamId})` : "";
-    row(dl, "Steam", `${CSO.plural(s.steam.apps, "app")} and ${CSO.plural(s.steam.subs, "package")}, ${CSO.formatCount(s.steam.named)} with names — via ${s.steam.method === "api" ? "Web API" : "browser login"}${who}, ${CSO.formatTime(s.steam.fetchedAt)}`);
+    const how = s.steam.method === "api" ? `the Steam Web API${s.steam.steamId ? ` (SteamID ${s.steam.steamId})` : ""}` : "your browser login";
+    row(dl, "Steam", `${CSO.plural(s.steam.apps, "game")} and ${CSO.plural(s.steam.subs, "package")} (names for ${CSO.formatCount(s.steam.named)}), read ${CSO.formatWhen(s.steam.fetchedAt)} through ${how}`);
   } else {
-    row(dl, "Steam", "not loaded yet");
+    row(dl, "Steam", "not read yet");
   }
-  if (s.gog) {
-    row(dl, "GOG", `${CSO.plural(s.gog.ids, "product")}, ${CSO.formatCount(s.gog.titled)} with titles — ${CSO.formatTime(s.gog.fetchedAt)}`);
-  } else {
-    row(dl, "GOG", "not loaded yet");
-  }
-  if (st) {
-    row(dl, "Matched", `${CSO.formatCount(st.steamItemsOwnedOnGog)} Steam store items carry a GOG badge · ${CSO.formatCount(st.gogItemsOwnedOnSteam)} GOG products carry a Steam badge — built ${CSO.formatTime(s.maps.builtAt)}`);
-  } else {
-    row(dl, "Matched", "nothing yet");
-  }
-  row(dl, "Refresh", status.refreshing ? "running…" : `last finished ${CSO.formatTime(status.finishedAt)}`);
+  row(dl, "GOG", s.gog ? `${CSO.plural(s.gog.ids, "game")} (names for ${CSO.formatCount(s.gog.titled)}), read ${CSO.formatWhen(s.gog.fetchedAt)}` : "not read yet");
+  row(dl, "Badges", st ? `${CSO.plural(st.steamItemsOwnedOnGog, "Steam game")} and ${CSO.plural(st.gogItemsOwnedOnSteam, "GOG game")} get a badge` : "none yet");
+  row(dl, "Last refresh", status.refreshing ? "running now" : status.finishedAt ? `finished ${CSO.formatWhen(status.finishedAt)}` : "never");
 
   renderProgress(status);
   const ul = $("messages");
   ul.textContent = "";
-  for (const text of status.errors) ul.append(el("li", "error", text));
-  for (const text of status.warnings) ul.append(el("li", "warning", text));
+  const { errors, warnings } = CSO.statusMessages(status);
+  for (const text of errors) ul.append(el("li", "error", text));
+  for (const text of warnings) ul.append(el("li", "warning", text));
 
   const btn = $("refresh");
   btn.disabled = !!status.refreshing;
@@ -296,6 +323,12 @@ async function loadBoth() {
   }
   bothGames = both && Array.isArray(both.games) ? both.games.filter((g) => g && typeof g.title === "string" && Array.isArray(g.steam) && Array.isArray(g.gog)) : [];
   renderBoth();
+}
+
+// The edition a game's one badge links to: an app over a package, then the shortest name
+// (the base game is usually the plain title, editions add words to it).
+function baseOf(items, nameOf, isApp) {
+  return [...items].sort((a, b) => (isApp(b) - isApp(a)) || ((nameOf(a) || "~").length - (nameOf(b) || "~").length))[0];
 }
 
 function renderBoth() {
@@ -322,23 +355,26 @@ function renderBoth() {
 
 function bothItem(g) {
   const li = el("li");
-  li.append(el("span", "title", g.title));
-  if (g.via === "title") li.append(el("span", "tag", "title match"));
+  const steamName = (s) => s.name || `Steam ${s.key.startsWith("sub/") ? "package" : "app"} ${s.key.split("/")[1]}`;
+  const gogName = (x) => x.title || `GOG product ${x.id}`;
+  const steamBase = baseOf(g.steam, (s) => s.name, (s) => s.key.startsWith("app/"));
+  const gogBase = baseOf(g.gog, (x) => x.title, () => true);
+
+  const title = el("span", "title");
+  const head = el("span", "", g.title);
+  if (g.via === "title") head.append(" ", el("span", "tag", "· title match"));
+  title.append(head);
+  // One badge per store for the base game; any other editions you own are named underneath.
+  const also = [
+    ...g.steam.filter((s) => s !== steamBase).map((s) => `${steamName(s)} on Steam`),
+    ...g.gog.filter((x) => x !== gogBase).map((x) => `${gogName(x)} on GOG`)
+  ];
+  if (also.length) title.append(el("span", "also", `Also owned: ${also.join(", ")}`));
+  li.append(title);
+
   const links = el("span", "links");
-  for (const s of g.steam) {
-    const a = link("S", s.url, "chip steam");
-    const what = s.name || `Steam ${s.key.startsWith("sub/") ? "package" : "app"} ${s.key.split("/")[1]}`;
-    a.title = `On Steam: ${what}`;
-    a.setAttribute("aria-label", `${g.title} on Steam: ${what}`);
-    links.append(a);
-  }
-  for (const x of g.gog) {
-    const a = link("G", x.url || "https://www.gog.com/en/account", "chip gog");
-    const what = x.title || `GOG product ${x.id}`;
-    a.title = `On GOG: ${what}`;
-    a.setAttribute("aria-label", `${g.title} on GOG: ${what}`);
-    links.append(a);
-  }
+  if (steamBase) links.append(pill("steam", steamBase.url, `${g.title} on Steam: ${steamName(steamBase)}`));
+  if (gogBase) links.append(pill("gog", gogBase.url || "https://www.gog.com/en/account", `${g.title} on GOG: ${gogName(gogBase)}`));
   li.append(links);
   return li;
 }
@@ -356,19 +392,40 @@ $("bothMore").addEventListener("click", () => {
 /* ---------------------------------------------------------------- hidden badges */
 
 async function renderHidden() {
-  let hidden = [];
+  let stored = {};
   try {
-    ({ hidden } = await browser.storage.local.get("hidden"));
+    stored = await browser.storage.local.get(["hidden", "hiddenNames"]);
   } catch (e) {
-    hidden = [];
+    stored = {};
   }
-  const n = CSO.hiddenList(hidden).length;
-  $("hiddenText").textContent = n ? `${CSO.plural(n, "badge")} ${n === 1 ? "is" : "are"} hidden.` : "No badges are hidden.";
-  $("unhideAll").disabled = !n;
+  const ids = CSO.hiddenList(stored.hidden);
+  const names = CSO.hiddenNames(stored.hiddenNames);
+  const list = $("hiddenList");
+  list.textContent = "";
+  $("hiddenCount").textContent = ids.length ? `· ${ids.length}` : "";
+  $("hiddenText").hidden = ids.length > 0;
+  $("unhideAll").disabled = !ids.length;
+  const rows = ids.map((id) => ({ id, name: names[id] || CSO.describeHidden(id), site: id.startsWith("gog:") ? "GOG" : "Steam" }));
+  rows.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  for (const r of rows) {
+    const li = el("li");
+    const title = el("span", "title");
+    title.append(el("span", "", r.name), el("span", "also", `badge hidden on ${r.site}`));
+    const btn = el("button", "small", "Show");
+    btn.type = "button";
+    btn.setAttribute("aria-label", `Show the badge on ${r.name} again`);
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      await CSO.setHidden(r.id, false);
+      toast("Badge shown again");
+    });
+    li.append(title, btn);
+    list.append(li);
+  }
 }
 
 $("unhideAll").addEventListener("click", async () => {
-  await browser.storage.local.set({ hidden: [] });
+  await browser.storage.local.set({ hidden: [], hiddenNames: {} });
   toast("All badges shown again");
 });
 
@@ -410,9 +467,14 @@ browser.storage.onChanged.addListener((changes, area) => {
     }
     renderBoth();
   }
-  if (changes.status || changes.maps || changes.settings) renderStatus();
+  if (changes.icons) {
+    icons = changes.icons.newValue || {};
+    updatePreview();
+    renderBoth();
+  }
+  if (changes.status || changes.maps || changes.settings || changes.icons) renderStatus();
   if (changes.both) loadBoth();
-  if (changes.hidden) renderHidden();
+  if (changes.hidden || changes.hiddenNames) renderHidden();
 });
 
 (async () => {
@@ -420,6 +482,11 @@ browser.storage.onChanged.addListener((changes, area) => {
     $("version").textContent = `v${browser.runtime.getManifest().version}`;
   } catch (e) {
     $("version").textContent = "";
+  }
+  try {
+    ({ icons = {} } = await browser.storage.local.get("icons"));
+  } catch (e) {
+    icons = {};
   }
   settings = await CSO.getSettings();
   credentials = await CSO.getCredentials();

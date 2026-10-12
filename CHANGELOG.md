@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.4.0] — 2026-10-12
+
+### Changed
+
+- New badges: the other store's own icon and the words **Owned on GOG** /
+  **Owned on Steam**, the same look on both stores. On a cover image the
+  badge is a tag merged into the corner. A title match reads **Maybe owned
+  on …** on a white badge instead of a dashed ring; bundles read **Own 2 of 5
+  on GOG**; the game-page badge shows an arrow because it opens the other
+  store.
+- The badge setting is now **Icon and words** or **Icon only**; the 0.3
+  badge text and badge colour settings are gone (the store icon replaces our
+  colours), and the toolbar count has one fixed colour.
+- Popup: fits Firefox's 600 px popup height; store cards show just the count
+  and a ✓ or the problem; **On this page** shows five games, then **Show
+  all**, and folds away while you search; a hidden game's badge fades with
+  its row; the first run shows three numbered steps instead of empty cards,
+  and the search box appears once both libraries are read; warnings sit in a
+  notice box in plain words.
+- Settings page regrouped into five cards: Status, Badges, Libraries, Owned
+  on both stores, Upkeep. The status numbers are behind **Details**, in
+  plain words; a store problem is said once, on its tile.
+- **Owned on both stores** shows one Steam and one GOG badge per game, for
+  the base game, and names the other editions you own underneath.
+- The refresh interval is set in hours, days or weeks, up to 4 weeks (was
+  1–168 hours).
+
+### Added
+
+- Settings → Upkeep lists each hidden badge by game name, with its own
+  **Show**. Badges hidden before 0.4.0 are listed by store and ID.
+
 ## [0.3.0] — 2026-10-05
 
 ### Added

@@ -15,13 +15,16 @@ and warnings.
 ## Where to look when something is off
 
 - **No badges anywhere** — popup: do both store cards show a count and a ✓?
-  If a card says *Not logged in* or shows an error, the refresh failed for
+  If a card says *Logged out* or shows an error, the refresh failed for
   that store (a red **!** on the toolbar icon says the same). If both are
   fine, check Settings → Badges (*Show … badges on …*), then open the Browser
   Console (Ctrl+Shift+J) and filter on `cross-store-owned`.
 - **One badge missing** — popup → **On this page**: if the game is listed
-  struck through, it was hidden; click **Show**. Settings → Hidden badges
-  resets them all.
+  struck through, it was hidden; click **Show**. Settings → Upkeep lists
+  every hidden badge with its own **Show**.
+- **A letter instead of the store icon** — the store's `/favicon.ico` could
+  not be read or decoded (a warning in the Browser Console says which). The
+  next refresh tries again; **Clear cached data** forces it.
 - **Badges on some tiles, not others** — the tile is probably missing the
   attribute the adapter keys on. Inspect it: Steam tiles need
   `data-ds-appid` / `data-ds-packageid`; GOG tiles need one of
@@ -32,8 +35,8 @@ and warnings.
 - **Badge in the wrong place** — the engine picks overlay vs inline from the
   element's computed display and whether it contains an image. An adapter can
   force `mode`, `container`, `anchor` and `corner` per tile.
-- **Steam title matches missing** — the popup warning "Steam game names
-  unavailable" means the store's `webapi_token` could not be read; ID matching
+- **Steam title matches missing** — the popup warning "Steam isn't giving out
+  game names right now" means the store's `webapi_token` could not be read; ID matching
   still works. Switching to the Web API method in Settings restores names.
 
 ## With the workspace (`.dev/`)

@@ -2,10 +2,14 @@
 
 const $ = (id) => document.getElementById(id);
 const refreshBtn = $("refresh");
-const PAGE_LIMIT = 60;
+const PAGE_ROWS = 5;   // "On this page" shows this many, then "Show all N"
 
 let settings = CSO.withDefaults(null);
+let icons = {};
 let lastStatus = null;
+let lastPage = null;
+let pageAll = false;        // "Show all N" clicked
+let pageOpen = false;       // "Show" clicked while a search folds the list
 let searchTimer = 0;
 let searchSeq = 0;
 
@@ -31,25 +35,40 @@ function sentence(s) {
   return t ? t[0].toUpperCase() + t.slice(1) : "";
 }
 
+// The small badge used in the lists: the store's favicon on a dark pill (white for a title match).
+function pill(store, href, label, maybe) {
+  const a = link("", href || CSO.STORES[store].home, `pill pill--${store}${maybe ? " pill--maybe" : ""}`);
+  a.append(CSO.storeIcon(icons, store, 14));
+  a.title = label;
+  a.setAttribute("aria-label", label);
+  return a;
+}
+
+const searching = () => $("q").value.trim().length > 0;
+
 /* ---------------------------------------------------------------- status */
 
-function renderStore(store, lib, problem, busy, extra) {
+function renderStore(store, lib, problem, busy) {
   const card = $(`store-${store}`);
   const count = card.querySelector(".store__count");
   const meta = card.querySelector(".store__meta");
   const login = card.querySelector(".store__login");
   const label = CSO.STORES[store].label;
+  const iconSlot = card.querySelector(".store__icon");
+  iconSlot.textContent = "";
+  iconSlot.append(CSO.storeIcon(icons, store, 16));
 
-  count.textContent = lib ? CSO.plural(lib.count, "item") : "Not loaded";
+  count.textContent = lib ? CSO.plural(lib.count, "item") : "Not read yet";
   let state = lib ? "ok" : "empty";
-  let metaText = lib ? `${CSO.since(lib.fetchedAt)}${extra ? ` · ${extra}` : ""}` : "";
+  let metaText = "";
   if (problem) {
     state = "error";
-    metaText = problem.login ? `Not logged in to ${label}${lib ? " — showing the last list read" : ""}` : sentence(problem.message);
+    metaText = problem.login ? `Logged out${lib ? " · last list kept" : ""}` : sentence(problem.message);
   }
   if (busy) state = "busy";
   card.dataset.state = state;
   meta.textContent = metaText;
+  meta.hidden = !metaText;
   login.hidden = !(problem && problem.login);
   card.setAttribute("aria-label", `${label}: ${count.textContent}${metaText ? `, ${metaText}` : ""}`);
 }
@@ -76,14 +95,21 @@ function renderProgress(status) {
 function renderMessages(status) {
   const ul = $("messages");
   ul.textContent = "";
+  const { errors, warnings } = CSO.statusMessages(status);
+  for (const text of errors) ul.append(el("li", "error", text));
+  for (const text of warnings) ul.append(el("li", "warning", text));
+}
+
+function renderSetup(s, status) {
+  const firstRun = !s.steam && !s.gog;
+  $("setup").hidden = !firstRun;
+  $("stores").hidden = firstRun;
+  document.querySelector(".bottom").hidden = firstRun;   // step 3 is the Refresh button then
+  if (!firstRun) return;
   const problems = status.problems || {};
-  // Store problems are shown on the store cards; the rest are listed here.
-  const own = [];
-  if (problems.match) own.push(`Matching failed: ${problems.match.message}`);
-  if (problems.other) own.push(`Refresh failed: ${problems.other.message}`);
-  const legacy = Object.keys(problems).length ? [] : status.errors.filter((e) => !/^Both libraries/.test(e));
-  for (const text of [...own, ...legacy]) ul.append(el("li", "error", text));
-  for (const text of status.warnings) ul.append(el("li", "warning", text));
+  $("step-steam").classList.toggle("done", !!s.steam && !problems.steam);
+  $("step-gog").classList.toggle("done", !!s.gog && !problems.gog);
+  $("setupRefresh").disabled = !!status.refreshing;
 }
 
 async function render() {
@@ -101,18 +127,19 @@ async function render() {
   const busyStep = status.refreshing && status.progress ? status.progress.step : "";
   $("perm").hidden = s.permissionsGranted;
 
-  renderStore("steam", s.steam && { count: s.steam.apps + s.steam.subs, fetchedAt: s.steam.fetchedAt },
-    status.problems.steam, busyStep === "steam", s.steam && (s.steam.method === "api" ? "Web API" : "browser login"));
-  renderStore("gog", s.gog && { count: s.gog.ids, fetchedAt: s.gog.fetchedAt }, status.problems.gog, busyStep === "gog", "");
+  renderSetup(s, status);
+  renderStore("steam", s.steam && { count: s.steam.apps + s.steam.subs }, status.problems.steam, busyStep === "steam");
+  renderStore("gog", s.gog && { count: s.gog.ids }, status.problems.gog, busyStep === "gog");
 
   const stats = s.maps && s.maps.stats;
   const both = stats ? (Number(stats.ownedOnBoth) || 0) + (settings.matchByTitle ? Number(stats.ownedOnBothByTitle) || 0 : 0) : 0;
   $("both").hidden = !stats;
   $("bothLink").textContent = both ? `You own ${CSO.plural(both, "game")} on both stores →` : "No game is owned on both stores yet";
-  $("intro").hidden = !!stats || status.refreshing;
 
   renderProgress(status);
   renderMessages(status);
+  // Search needs both libraries; until then the box could only ever say "not found".
+  $("searchPanel").hidden = !(s.steam && s.gog);
 
   refreshBtn.disabled = !!status.refreshing;
   refreshBtn.textContent = status.refreshing ? "Refreshing…" : "Refresh now";
@@ -122,7 +149,6 @@ async function render() {
 /* ---------------------------------------------------------------- on this page */
 
 async function loadPage() {
-  const section = $("page");
   let tab;
   try {
     [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -137,22 +163,26 @@ async function loadPage() {
       r = null;   // not a store page, or a page Firefox keeps extensions out of
     }
   }
-  if (!r || !r.ok) {
-    section.hidden = true;
-    return;
-  }
-  section.hidden = false;
-  renderPage(r);
+  lastPage = r && r.ok ? r : null;
+  renderPage();
 }
 
-function renderPage(r) {
+function renderPage() {
+  const r = lastPage;
+  const section = $("page");
+  section.hidden = !r;
+  if (!r) return;
   const list = $("pageList");
   const note = $("pageNote");
-  const heading = $("pageHeading");
+  const count = $("pageCount");
+  const toggle = $("pageToggle");
+  const more = $("pageMore");
   list.textContent = "";
-  heading.textContent = "On this page";
   note.textContent = "";
   note.hidden = true;
+  count.textContent = "";
+  toggle.hidden = true;
+  more.hidden = true;
 
   if (!r.enabled) {
     note.hidden = false;
@@ -173,27 +203,36 @@ function renderPage(r) {
     note.textContent = "Matches are not ready yet — they appear once both libraries have been read.";
     return;
   }
-  const visible = r.items.filter((i) => !i.hidden).length;
-  heading.append(" ", el("span", "muted", `· ${visible} owned on ${r.otherLabel}`));
   if (!r.items.length) {
     note.hidden = false;
     note.textContent = `Nothing on this page that you own on ${r.otherLabel}.`;
     return;
   }
-  for (const item of r.items.slice(0, PAGE_LIMIT)) list.append(pageItem(item, r));
-  if (r.items.length > PAGE_LIMIT) list.append(el("li", "muted", `… and ${r.items.length - PAGE_LIMIT} more`));
+  const visible = r.items.filter((i) => !i.hidden).length;
+  count.textContent = `· ${visible} owned on ${r.otherLabel}`;
+  // While you search, the page list folds to its heading so the results fit the popup.
+  if (searching() && !pageOpen) {
+    toggle.hidden = false;
+    note.hidden = false;
+    note.textContent = "Folded while you search.";
+    return;
+  }
+  const rows = pageAll ? r.items : r.items.slice(0, PAGE_ROWS);
+  for (const item of rows) list.append(pageItem(item, r));
+  if (r.items.length > rows.length) {
+    more.hidden = false;
+    more.textContent = `Show all ${r.items.length}`;
+  }
 }
 
 function pageItem(item, r) {
   const li = el("li", item.hidden ? "is-hidden" : "");
-  const letter = r.site === "gog" ? "S" : "G";
-  const chip = link(letter, item.url || "#", `chip ${r.site === "gog" ? "steam" : "gog"}${item.via === "title" ? " fuzzy" : ""}`);
-  chip.title = `Open on ${r.otherLabel}`;
-  chip.setAttribute("aria-label", `Open ${item.title} on ${r.otherLabel}`);
+  const other = r.site === "gog" ? "steam" : "gog";
+  li.append(pill(other, item.url, `Open ${item.title} on ${r.otherLabel}`, item.via === "title"));
   const title = el("span", "title", item.title);
-  const other = item.others.find((o) => o.title);
-  title.title = other && other.title !== item.title ? `${item.title} — owned as “${other.title}”` : item.title;
-  li.append(chip, title);
+  const owned = item.others.find((o) => o.title);
+  title.title = owned && owned.title !== item.title ? `${item.title} — owned as “${owned.title}”` : item.title;
+  li.append(title);
   if (item.total > 1) li.append(el("span", "tag", `${item.owned}/${item.total}`));
   if (item.via === "title") li.append(el("span", "tag", "title match"));
   const btn = el("button", "link-btn", item.hidden ? "Show" : "Hide");
@@ -202,13 +241,23 @@ function pageItem(item, r) {
   btn.setAttribute("aria-label", `${item.hidden ? "Show" : "Hide"} the badge on ${item.title}`);
   btn.addEventListener("click", async () => {
     btn.disabled = true;
-    await CSO.setHidden(item.id, !item.hidden);
+    await CSO.setHidden(item.id, !item.hidden, item.title);
     // The content script redraws on the storage change; ask again once it has.
     setTimeout(loadPage, 200);
   });
   li.append(btn);
   return li;
 }
+
+$("pageToggle").addEventListener("click", () => {
+  pageOpen = true;
+  renderPage();
+});
+
+$("pageMore").addEventListener("click", () => {
+  pageAll = true;
+  renderPage();
+});
 
 /* ---------------------------------------------------------------- search */
 
@@ -242,7 +291,7 @@ async function search() {
   const hints = [];
   if (lastStatus && lastStatus.steam && !r.steamNames) hints.push("Steam game names are unavailable, so only GOG titles are searched.");
   if (!r.total) {
-    note.textContent = [`Not found in your libraries.`, ...hints].join(" ");
+    note.textContent = ["Not found in your libraries.", ...hints].join(" ");
     return;
   }
   note.textContent = [r.total > r.results.length ? `Showing ${r.results.length} of ${r.total}.` : CSO.plural(r.total, "match", "matches") + ".", ...hints].join(" ");
@@ -250,25 +299,17 @@ async function search() {
     const li = el("li");
     li.append(el("span", "title", item.title));
     if (item.via === "title") li.append(el("span", "tag", "title match"));
-    const links = el("span", "links");
-    if (item.steam) {
-      const a = link("S", item.steam, "chip steam");
-      a.title = "Owned on Steam — open its store page";
-      a.setAttribute("aria-label", `${item.title}: owned on Steam`);
-      links.append(a);
-    }
-    if (item.gog) {
-      const a = link("G", item.gog, "chip gog");
-      a.title = "Owned on GOG — open its page";
-      a.setAttribute("aria-label", `${item.title}: owned on GOG`);
-      links.append(a);
-    }
-    li.append(links);
+    const pills = el("span", "pill-group");
+    if (item.steam) pills.append(pill("steam", item.steam, `${item.title}: owned on Steam`));
+    if (item.gog) pills.append(pill("gog", item.gog, `${item.title}: owned on GOG`));
+    li.append(pills);
     list.append(li);
   }
 }
 
 $("q").addEventListener("input", () => {
+  pageOpen = false;
+  renderPage();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(search, 120);
 });
@@ -281,16 +322,21 @@ $("q").addEventListener("input", () => {
 browser.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.settings) settings = CSO.withDefaults(changes.settings.newValue);
-  if (changes.status || changes.maps || changes.settings) render();
-  if (changes.maps || changes.hidden || changes.settings) setTimeout(loadPage, 200);
-  if (changes.both && $("q").value.trim()) search();
+  if (changes.icons) icons = changes.icons.newValue || {};
+  if (changes.status || changes.maps || changes.settings || changes.icons) render();
+  if (changes.maps || changes.hidden || changes.settings || changes.icons) setTimeout(loadPage, 200);
+  if ((changes.both || changes.icons) && $("q").value.trim()) search();
 });
 
-refreshBtn.addEventListener("click", () => {
+function refreshNow(btn) {
+  btn.disabled = true;
   refreshBtn.disabled = true;
   refreshBtn.textContent = "Refreshing…";
   browser.runtime.sendMessage({ type: "refreshNow" }).catch(() => {}).then(render);
-});
+}
+
+refreshBtn.addEventListener("click", () => refreshNow(refreshBtn));
+$("setupRefresh").addEventListener("click", (ev) => refreshNow(ev.currentTarget));
 
 $("settings").addEventListener("click", () => {
   browser.runtime.openOptionsPage();
@@ -311,6 +357,11 @@ $("grant").addEventListener("click", async () => {
 
 (async () => {
   settings = await CSO.getSettings();
+  try {
+    ({ icons = {} } = await browser.storage.local.get("icons"));
+  } catch (e) {
+    icons = {};
+  }
   await render();
   await loadPage();
 })();

@@ -6,6 +6,8 @@
  *   settings    user settings (see CSO.DEFAULT_SETTINGS in lib/common.js); also read by content scripts
  *   credentials Steam Web API key + SteamID64, IsThereAnyDeal key (CSO.DEFAULT_CREDENTIALS); background/options only
  *   hidden      badges the user hid, ["steam:app/55", "gog:2000", …] (CSO.hiddenList); read by content scripts
+ *   hiddenNames { "<hidden id>": "game name" } for the settings page's list (CSO.hiddenNames)
+ *   icons       each store's favicon as pixels and a PNG data: URL (CSO.iconOf); read by content scripts
  *   lib_steam   { apps: number[], subs: number[], names: {appid: name}, steamId, method, fetchedAt, warning }
  *   lib_gog     { ids: number[], info: {gogId: {title, url}}, fetchedAt, warning }
  *   itad_cache  { steamToItad, gogToItad, itadToSteam, itadToGog }  each {key: {v, t}}
@@ -29,6 +31,10 @@ const STALE_LOCK_MS = 15 * 60e3;    // treat a "refreshing" flag older than this
 const FETCH_TIMEOUT_MS = 30e3;      // one request; a refresh is many
 const SEARCH_LIMIT = 30;
 const BADGE_ERROR_COLOR = "#b3261e";
+// The badges show the other store's own favicon. Fetched without cookies, kept a month.
+const ICON_SOURCES = { steam: "https://store.steampowered.com/favicon.ico", gog: "https://www.gog.com/favicon.ico" };
+const ICON_SIZE = 32;               // stored at 2× the 16 px it is drawn at
+const ICON_MAX_AGE = 30 * 86400e3;
 const BADGE_BUSY_COLOR = "#5b6470";
 
 let refreshPromise = null;
@@ -135,7 +141,8 @@ async function fetchSteamSession() {
     names = owned.names;
     apps = union(apps, owned.apps);
   } catch (e) {
-    warning = `Steam game names unavailable, so title matching and search are off for Steam games (${e.message}).`;
+    console.warn(`[${CSO.NAME}] Steam game names unavailable: ${e.message}`);
+    warning = "Steam isn't giving out game names right now, so search and title matches only cover GOG titles. Badges by store ID still work.";
   }
   return { apps, subs, names, steamId, method: "session", fetchedAt: Date.now(), warning };
 }
@@ -158,7 +165,7 @@ async function fetchSteamApi(credentials) {
     apps = union(apps, ds.rgOwnedApps || []);
     subs = ds.rgOwnedPackages || [];
   } catch (e) {
-    warning = "Not logged in to the Steam store in this browser, so DLC/package ownership is not included.";
+    warning = "You're not logged in to the Steam store in Firefox, so DLC and packages you own aren't included.";
   }
   return { apps, subs, names: owned.names, steamId: credentials.steamId64, method: "api", fetchedAt: Date.now(), warning };
 }
@@ -237,7 +244,8 @@ async function fetchGogLibrary() {
       } while (page <= totalPages && page <= 400);
     }
   } catch (e) {
-    warning = `GOG titles only partially loaded, so links, search and title matching may be incomplete (${e.message}).`;
+    console.warn(`[${CSO.NAME}] GOG titles only partly read: ${e.message}`);
+    warning = "Only some GOG game names could be read, so links, search and title matches may miss some games.";
   }
   return { ids, info, fetchedAt: Date.now(), warning };
 }
@@ -545,7 +553,7 @@ async function setPageCount(tab, count, site) {
     if (n) {
       const other = site === "gog" ? "Steam" : "GOG";
       await browser.action.setBadgeText({ tabId, text: n > 999 ? "999+" : String(n) });
-      await browser.action.setBadgeBackgroundColor({ tabId, color: site === "gog" ? settings.steamColor : settings.gogColor });
+      await browser.action.setBadgeBackgroundColor({ tabId, color: CSO.TOOLBAR_COLOR });
       await browser.action.setTitle({ tabId, title: `Cross-Store Owned — ${CSO.plural(n, "game")} on this page you own on ${other}` });
     } else {
       // null hands the tab back to the global badge (which may be "!").
@@ -557,6 +565,50 @@ async function setPageCount(tab, count, site) {
     return { ok: false, error: e.message };   // the tab closed meanwhile
   }
   return { ok: true, count: n };
+}
+
+/* ---------------------------------------------------------------- store icons */
+
+function bytesToBase64(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// A favicon file -> { size, rgba, png } at ICON_SIZE px. The background page has a DOM, so
+// decoding happens here and the store pages only ever receive pixels.
+async function decodeIcon(blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = ICON_SIZE;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, 0, 0, ICON_SIZE, ICON_SIZE);
+  const rgba = ctx.getImageData(0, 0, ICON_SIZE, ICON_SIZE).data;
+  return { size: ICON_SIZE, rgba: bytesToBase64(new Uint8Array(rgba.buffer)), png: canvas.toDataURL("image/png") };
+}
+
+// Fetch any store icon that is missing or older than ICON_MAX_AGE. Best effort: a store that
+// cannot be reached keeps its old icon, or the badge falls back to the store's letter.
+async function refreshIcons(force) {
+  const stored = await getLocal("icons", {});
+  const icons = {};
+  for (const store of Object.keys(ICON_SOURCES)) if (CSO.iconOf(stored, store)) icons[store] = stored[store];
+  let changed = false;
+  for (const [store, url] of Object.entries(ICON_SOURCES)) {
+    const have = icons[store];
+    if (!force && have && Date.now() - (Number(have.fetchedAt) || 0) < ICON_MAX_AGE) continue;
+    try {
+      const res = await fetch(url, { credentials: "omit", signal: timeoutSignal() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      icons[store] = { ...(await decodeIcon(await res.blob())), fetchedAt: Date.now() };
+      changed = true;
+    } catch (e) {
+      console.warn(`[${CSO.NAME}] could not read the ${CSO.STORES[store].label} icon: ${e.message}`);
+    }
+  }
+  if (changed) await setLocal({ icons });
+  return icons;
 }
 
 /* ---------------------------------------------------------------- refresh orchestration */
@@ -593,6 +645,8 @@ async function refreshAll(reason) {
     const status = { refreshing: false, startedAt, finishedAt: Date.now(), reason, errors, warnings, problems };
     await setLocal({ status });
     await updateGlobalBadge(status);
+    // After the status write, so a slow icon request never holds up the popup.
+    await refreshIcons(false).catch((e) => console.warn(`[${CSO.NAME}] store icons: ${e.message}`));
   })().finally(() => {
     liveStatus = null;
     refreshPromise = null;
@@ -715,7 +769,7 @@ async function scheduleAlarm() {
 }
 
 async function clearCache() {
-  await browser.storage.local.remove(["lib_steam", "lib_gog", "itad_cache", "maps", "both", "status"]);
+  await browser.storage.local.remove(["lib_steam", "lib_gog", "itad_cache", "maps", "both", "status", "icons"]);
   searchIndex = null;
   await updateGlobalBadge({});
   return { ok: true };
@@ -768,7 +822,7 @@ browser.alarms.onAlarm.addListener((alarm) => {
 browser.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.lib_steam || changes.lib_gog || changes.both) searchIndex = null;
-  // Only a new interval moves the schedule; a colour change must not postpone the next refresh.
+  // Only a new interval moves the schedule; another setting must not postpone the next refresh.
   if (changes.settings) {
     const before = CSO.refreshHours(CSO.withDefaults(changes.settings.oldValue));
     const after = CSO.refreshHours(CSO.withDefaults(changes.settings.newValue));

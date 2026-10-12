@@ -4,7 +4,8 @@
  *
  * adapter = {
  *   site,                                  // "steam" / "gog": the store this page belongs to
- *   badgeClass, badgeLetter, otherLabel,   // "gog" / "G" / "GOG" on Steam pages, etc.
+ *   badgeClass, badgeLetter, otherLabel,   // "gog" / "G" / "GOG" on Steam pages, etc. (badgeClass also
+ *                                          //   names the store whose icon the badge shows)
  *   attributes: [...],                     // attributes to watch for late-rendered or changed IDs
  *   collect(root) -> [target],             // {el, keys, altKeys?, title?, label?, container?, mode?, anchor?, corner?, expanded?}
  *                                          //   title: matched by name; label: shown in the popup (defaults to title)
@@ -28,6 +29,7 @@
   let maps = null;
   let settings = null;
   let hidden = new Set();
+  let iconData = null;                 // { size, bytes } of the other store's favicon, or null → letter
   let flushTimer = 0;
   let reportTimer = 0;
   let lastReport = "";
@@ -47,14 +49,14 @@
     adapter = a;
     let stored = {};
     try {
-      stored = await browser.storage.local.get(["maps", "settings", "hidden"]);
+      stored = await browser.storage.local.get(["maps", "settings", "hidden", "icons"]);
     } catch (e) {
       console.warn(`[${CSO.NAME}] storage unavailable, no badges on this page: ${e.message}`);
     }
     settings = CSO.withDefaults(stored.settings);
     maps = CSO.isMaps(stored.maps) ? stored.maps : null;
     hidden = new Set(CSO.hiddenList(stored.hidden));
-    applyColors();
+    setIcon(stored.icons);
 
     let loggedIn = null;
     try {
@@ -79,11 +81,9 @@
       if (area !== "local") return;
       if (changes.maps) maps = CSO.isMaps(changes.maps.newValue) ? changes.maps.newValue : null;
       if (changes.hidden) hidden = new Set(CSO.hiddenList(changes.hidden.newValue));
-      if (changes.settings) {
-        settings = CSO.withDefaults(changes.settings.newValue);
-        applyColors();
-      }
-      if (changes.maps || changes.settings || changes.hidden) {
+      if (changes.settings) settings = CSO.withDefaults(changes.settings.newValue);
+      if (changes.icons) setIcon(changes.icons.newValue);
+      if (changes.maps || changes.settings || changes.hidden || changes.icons) {
         clearBadges();
         processTree(document);
         scheduleReport(true);
@@ -95,10 +95,43 @@
     return adapter.site === "gog" ? settings.showOnGog : settings.showOnSteam;
   }
 
-  function applyColors() {
-    const s = document.documentElement.style;
-    s.setProperty("--cso-gog", settings.gogColor || CSO.DEFAULT_SETTINGS.gogColor);
-    s.setProperty("--cso-steam", settings.steamColor || CSO.DEFAULT_SETTINGS.steamColor);
+  // The badge shows the other store's favicon, stored by the background page as raw pixels.
+  function setIcon(icons) {
+    const icon = CSO.iconOf(icons, adapter.badgeClass);
+    iconData = null;
+    if (!icon) return;
+    try {
+      const bin = atob(icon.rgba);
+      if (bin.length !== icon.size * icon.size * 4) return;
+      const bytes = new Uint8ClampedArray(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      iconData = { size: icon.size, bytes };
+    } catch (e) {
+      iconData = null;
+    }
+  }
+
+  // A <canvas> with the favicon, drawn here so that no image is loaded into the store page
+  // (its Content Security Policy would apply); the store's letter when there is no icon.
+  function makeIcon() {
+    const wrap = document.createElement("span");
+    wrap.className = "cso-badge__icon";
+    if (iconData) {
+      const c = document.createElement("canvas");
+      c.width = c.height = iconData.size;
+      const ctx = c.getContext && c.getContext("2d");
+      if (ctx) {
+        const img = ctx.createImageData(iconData.size, iconData.size);
+        img.data.set(iconData.bytes);
+        ctx.putImageData(img, 0, 0);
+        c.className = "cso-badge__favicon";
+        wrap.append(c);
+        return wrap;
+      }
+    }
+    wrap.classList.add("cso-badge__icon--letter");
+    wrap.textContent = adapter.badgeLetter;
+    return wrap;
   }
 
   /* ---------------------------------------------------------------- popup and toolbar */
@@ -260,39 +293,38 @@
 
   function makeBadge({ owned, total, via, names, more, url, expanded, others }) {
     const b = document.createElement("span");
-    b.className = `cso-badge cso-badge--${adapter.badgeClass}` + (via === "title" ? " cso-badge--fuzzy" : "");
-    if (settings.badgeText === "name") b.classList.add("cso-badge--name");
+    const maybe = via === "title";
+    const iconOnly = settings.badgeLabel === "icon" && !expanded;
+    b.className = `cso-badge cso-badge--${adapter.badgeClass}` + (maybe ? " cso-badge--maybe" : "") + (iconOnly ? " cso-badge--icon-only" : "");
     b.setAttribute("role", "link");
     b.tabIndex = 0;
+    b.append(makeIcon());
 
-    const letter = document.createElement("span");
-    letter.className = "cso-badge__letter";
-    letter.textContent = settings.badgeText === "name" ? adapter.otherLabel : adapter.badgeLetter;
-    b.append(letter);
-
-    if (total > 1) {
+    const other = adapter.otherLabel;
+    let words = total > 1 ? `Own ${owned} of ${total} on ${other}` : maybe ? `Maybe owned on ${other}` : `Owned on ${other}`;
+    const tail = names.length ? `${names.join(" • ")}${more ? " …" : ""}` : "";
+    if (expanded && names.length) words += `: ${names[0]}${names.length > 1 ? ` (+${names.length - 1})` : ""}`;
+    if (!iconOnly) {
+      const text = document.createElement("span");
+      text.className = "cso-badge__text";
+      text.textContent = words;
+      b.append(text);
+    } else if (total > 1) {
       const c = document.createElement("span");
       c.className = "cso-badge__count";
       c.textContent = `${owned}/${total}`;
       b.append(c);
     }
-
-    let head = `Owned on ${adapter.otherLabel}`;
-    if (via === "title") head += " (title match)";
-    if (total > 1) head += `: ${owned} of ${total}`;
-    const tail = names.length ? `${names.join(" • ")}${more ? " …" : ""}` : "";
-    const line = tail ? `${head}: ${tail}` : head;
-    const note = via === "title" ? "\nMatched by name, not by store ID — it may be a different edition." : "";
-    b.title = `${line}${note}`;
-    b.setAttribute("aria-label", `${line}. Opens ${adapter.otherLabel} in a new tab.`);
-
     if (expanded) {
       b.classList.add("cso-badge--expanded");
-      const text = document.createElement("span");
-      text.className = "cso-badge__text";
-      text.textContent = tail ? `${head}: ${names[0]}${names.length > 1 ? ` (+${names.length - 1})` : ""}` : head;
-      b.append(text);
+      b.append(arrowIcon());
     }
+
+    const head = total > 1 ? `You own ${owned} of ${total} on ${other}` : maybe ? `Probably owned on ${other}` : `Owned on ${other}`;
+    const line = tail ? `${head}: ${tail}` : head;
+    const note = maybe ? "\nMatched by name, not by store ID — it may be a different edition." : "";
+    b.title = `${line}${note}`;
+    b.setAttribute("aria-label", `${line}. Opens ${other} in a new tab.`);
 
     b.dataset.url = url;
 
@@ -313,6 +345,19 @@
     return b;
   }
 
+  // A small "opens elsewhere" arrow for the game-page badge, built as SVG (no markup strings).
+  function arrowIcon() {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "cso-badge__arrow");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", "M7 17L17 7M9 7h8v8");
+    svg.append(path);
+    return svg;
+  }
+
   function autoMode(el) {
     const display = getComputedStyle(el).display;
     if (display === "inline" || display === "contents") return "inline";
@@ -330,7 +375,7 @@
     } else {
       const container = t.container || t.el;
       if (getComputedStyle(container).position === "static") container.style.position = "relative";
-      badge.classList.add("cso-badge--overlay", t.corner === "tr" ? "cso-tr" : "cso-tl");
+      badge.classList.add("cso-badge--corner", t.corner === "tr" ? "cso-tr" : "cso-tl");
       container.append(badge);
     }
   }

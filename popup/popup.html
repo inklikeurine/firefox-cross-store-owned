@@ -6,57 +6,72 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header class="top">
-    <img src="../icons/icon.svg" alt="" width="22" height="22">
-    <h1>Cross-Store Owned</h1>
-    <button id="settings" class="icon-btn" type="button" title="Settings" aria-label="Settings">
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg>
-    </button>
-  </header>
+  <main class="main">
+    <header class="top">
+      <img src="../icons/icon.svg" alt="" width="22" height="22">
+      <h1>Cross-Store Owned</h1>
+      <button id="settings" class="icon-btn" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg>
+      </button>
+    </header>
 
-  <section id="perm" class="notice warn" hidden>
-    <p>Firefox has not given this extension access to Steam, GOG and IsThereAnyDeal, so it cannot read your libraries.</p>
-    <button id="grant" class="primary" type="button">Grant site access</button>
-  </section>
+    <section id="perm" class="notice warn" hidden>
+      <p>Firefox has not given this extension access to Steam, GOG and IsThereAnyDeal, so it cannot read your libraries.</p>
+      <button id="grant" class="primary" type="button">Grant site access</button>
+    </section>
 
-  <p id="intro" class="intro" hidden>Log in to both stores in Firefox, then click <strong>Refresh now</strong>. Games you own on one store get a badge on the other.</p>
+    <section id="setup" class="setup" hidden aria-labelledby="setupHeading">
+      <p id="setupHeading">Games you own on one store get a badge on the other. Three steps to start:</p>
+      <ol class="steps">
+        <li id="step-steam"><span class="step__mark" aria-hidden="true">1</span><span class="step__text"><strong>Log in to Steam</strong> in Firefox</span><a class="step__link" href="https://store.steampowered.com/login/" target="_blank" rel="noopener">Open Steam</a></li>
+        <li id="step-gog"><span class="step__mark" aria-hidden="true">2</span><span class="step__text"><strong>Log in to GOG</strong> in Firefox</span><a class="step__link" href="https://www.gog.com/#openlogin" target="_blank" rel="noopener">Open GOG</a></li>
+        <li id="step-refresh"><span class="step__mark" aria-hidden="true">3</span><span class="step__text"><strong>Read your libraries</strong></span><button id="setupRefresh" class="primary small" type="button">Refresh now</button></li>
+      </ol>
+      <p class="muted">Each step gets a ✓ once a refresh has read that store. The first read takes a few seconds per thousand games.</p>
+    </section>
 
-  <section class="stores" aria-label="Your libraries">
-    <article class="store" id="store-steam" data-state="empty">
-      <div class="store__head"><span class="chip steam" aria-hidden="true">S</span><span class="store__name">Steam</span><span class="store__state" aria-hidden="true"></span></div>
-      <div class="store__count">Not loaded</div>
-      <div class="store__meta"></div>
-      <a class="store__login" href="https://store.steampowered.com/login/" target="_blank" rel="noopener" hidden>Log in to Steam</a>
-    </article>
-    <article class="store" id="store-gog" data-state="empty">
-      <div class="store__head"><span class="chip gog" aria-hidden="true">G</span><span class="store__name">GOG</span><span class="store__state" aria-hidden="true"></span></div>
-      <div class="store__count">Not loaded</div>
-      <div class="store__meta"></div>
-      <a class="store__login" href="https://www.gog.com/#openlogin" target="_blank" rel="noopener" hidden>Log in to GOG</a>
-    </article>
-  </section>
+    <section id="stores" class="stores" aria-label="Your libraries">
+      <article class="store" id="store-steam" data-state="empty">
+        <div class="store__head"><span class="store__icon"></span><span class="store__name">Steam</span><span class="store__state" aria-hidden="true"></span></div>
+        <div class="store__count">Not read yet</div>
+        <div class="store__meta" hidden></div>
+        <a class="store__login" href="https://store.steampowered.com/login/" target="_blank" rel="noopener" hidden>Log in to Steam</a>
+      </article>
+      <article class="store" id="store-gog" data-state="empty">
+        <div class="store__head"><span class="store__icon"></span><span class="store__name">GOG</span><span class="store__state" aria-hidden="true"></span></div>
+        <div class="store__count">Not read yet</div>
+        <div class="store__meta" hidden></div>
+        <a class="store__login" href="https://www.gog.com/#openlogin" target="_blank" rel="noopener" hidden>Log in to GOG</a>
+      </article>
+    </section>
 
-  <p id="both" class="both" hidden><a id="bothLink" href="#"></a></p>
+    <p id="both" class="both" hidden><a id="bothLink" href="#"></a></p>
 
-  <section id="progress" class="progress" hidden aria-live="polite">
-    <div class="progress__label" id="progressLabel"></div>
-    <div class="progress__bar" role="progressbar" aria-labelledby="progressLabel" id="progressBar"><div class="progress__fill" id="progressFill"></div></div>
-  </section>
+    <section id="progress" class="progress" hidden aria-live="polite">
+      <div class="progress__label" id="progressLabel"></div>
+      <div class="progress__bar" role="progressbar" aria-labelledby="progressLabel" id="progressBar"><div class="progress__fill" id="progressFill"></div></div>
+    </section>
 
-  <ul id="messages" class="messages"></ul>
+    <ul id="messages" class="messages" aria-live="polite"></ul>
 
-  <section id="page" class="panel" hidden aria-labelledby="pageHeading">
-    <h2 id="pageHeading">On this page</h2>
-    <p id="pageNote" class="muted"></p>
-    <ul id="pageList" class="items"></ul>
-  </section>
+    <section id="page" class="panel" hidden aria-labelledby="pageHeading">
+      <div class="panel__head">
+        <h2 id="pageHeading">On this page</h2>
+        <span id="pageCount" class="muted"></span>
+        <button id="pageToggle" class="link-btn" type="button" hidden>Show</button>
+      </div>
+      <p id="pageNote" class="muted" hidden></p>
+      <ul id="pageList" class="items"></ul>
+      <button id="pageMore" class="text-btn" type="button" hidden></button>
+    </section>
 
-  <section class="panel" aria-labelledby="searchHeading">
-    <h2 id="searchHeading"><label for="q">Do I own…?</label></h2>
-    <input id="q" type="search" placeholder="Search both libraries by name" autocomplete="off" spellcheck="false">
-    <p id="searchNote" class="muted" hidden></p>
-    <ul id="results" class="items"></ul>
-  </section>
+    <section id="searchPanel" class="panel" hidden>
+      <h2><label for="q">Do I own…?</label></h2>
+      <input id="q" type="search" placeholder="Search both libraries by name" autocomplete="off" spellcheck="false">
+      <p id="searchNote" class="muted" hidden></p>
+      <ul id="results" class="items"></ul>
+    </section>
+  </main>
 
   <footer class="bottom">
     <span id="last" class="muted"></span>
