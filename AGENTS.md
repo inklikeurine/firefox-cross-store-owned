@@ -27,8 +27,9 @@ On a clone without `../_workshop/`, the essentials still apply, done by hand:
 
 - `docs/spec.md` is the product spec; read it before changing behaviour.
 - Every change to a shipped file (anything but `README.md`, `CHANGELOG.md`,
-  `docs/` and the repo files) bumps `version` in `manifest.json` (semver)
-  and adds a dated `CHANGELOG.md` entry.
+  `docs/` and the repo files) needs a `version` in `manifest.json` (semver) above the last release's
+  (the highest `v<x.y.z>` tag), bumped once per release, not per change
+  or push, and a dated `CHANGELOG.md` entry for it.
 - `web-ext lint --source-dir . --warnings-as-errors --ignore-files AGENTS.md CLAUDE.md UNLICENSE`
   must pass (CI runs it on every push).
 - No `package.json`, bundler, `eval`, remote code or inline scripts.
