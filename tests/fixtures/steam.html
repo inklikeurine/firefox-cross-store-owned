@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Cross-Store Owned — Steam fixture</title>
+    <style>
+      body { font: 14px sans-serif; margin: 24px; background: #1b2838; color: #c6d4df; }
+      .search_result_row { display: block; padding: 6px; margin: 4px 0; background: #2a475e; }
+      .tile { display: inline-block; width: 184px; margin: 8px; background: #2a475e; }
+      .tile img { display: block; width: 184px; height: 69px; background: #16202d; }
+      .title { font-weight: bold; }
+      #appHubAppName { display: block; font-size: 24px; margin: 16px 0; }
+    </style>
+  </head>
+  <body>
+    <!-- Steam's header when logged out: the adapter's isLoggedIn() reads it. -->
+    <div id="global_actions"><a class="global_action_link" href="https://store.steampowered.com/login/">login</a></div>
+    <h1>Cross-Store Owned — Steam-shaped fixture</h1>
+    <p>Served by the harness at a store.steampowered.com URL so <code>content/steam.js</code> runs. Only the attributes the adapter reads are real.</p>
+
+    <!-- App page title: pageTarget() anchors an expanded pill after it when the URL is /app/10/… -->
+    <div id="appHubAppName" role="heading" aria-level="1">Cyberpunk 2077</div>
+
+    <h2>Search rows (block, no image → inline badge)</h2>
+    <a class="search_result_row" data-ds-appid="10" href="#"><span class="title">Cyberpunk 2077</span></a>
+    <a class="search_result_row" data-ds-appid="55" href="#"><span class="title">The Witcher 3: Wild Hunt</span></a>
+    <a class="search_result_row" data-ds-appid="999" href="#"><span class="title">Not Owned Anywhere</span></a>
+
+    <h2>Capsules (image → overlay badge)</h2>
+    <a class="tile" data-ds-appid="11" href="#"><img alt="Cyberpunk 2077 — Phantom Liberty"><div class="title">Cyberpunk 2077 — Phantom Liberty</div></a>
+    <a class="tile" id="bundle" data-ds-packageid="1390270" data-ds-appid="10,11,12" href="#"><img alt="Bundle"><div class="title">Bundle</div></a>
+    <a class="tile" id="package" data-ds-packageid="777" href="#"><img alt="Package"><div class="title">Package 777</div></a>
+
+    <h2>Nested wrapper (same app on wrapper and child → one badge)</h2>
+    <div id="nested" data-ds-appid="10"><a data-ds-appid="10" href="#"><span class="title">Cyberpunk 2077</span></a></div>
+
+    <h2>React-style links (no data-ds-* → link fallback; only image links get a badge)</h2>
+    <div id="react">
+      <a id="link-owned" href="https://store.steampowered.com/app/11/Phantom_Liberty/"><img alt="Cyberpunk 2077 — Phantom Liberty"></a>
+      <a id="link-unowned" href="/app/999/Not_Owned/"><img alt="Not Owned Anywhere"></a>
+      <a id="link-text" href="/app/10/"><span>Cyberpunk 2077 (text link)</span></a>
+      <a id="link-community" href="https://steamcommunity.com/app/10/"><img alt="Community hub"></a>
+    </div>
+
+    <h2>Late-rendered tile (added after load → MutationObserver)</h2>
+    <div id="late"></div>
+  </body>
+</html>

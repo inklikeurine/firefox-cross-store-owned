@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Cross-Store Owned — GOG fixture</title>
+    <style>
+      body { font: 14px sans-serif; margin: 24px; background: #f2f2f2; color: #222; }
+      product-tile { display: inline-block; width: 200px; margin: 8px; vertical-align: top; }
+      .product-tile { display: block; background: #fff; }
+      .product-tile__image-wrapper { display: block; height: 100px; background: #ddd; }
+      .product-tile__image-wrapper img { display: block; width: 100%; height: 100%; }
+      .productcard-basics__title { font-size: 24px; }
+      nav a { display: block; padding: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Cross-Store Owned — GOG-shaped fixture</h1>
+    <p>Served by the harness at a www.gog.com URL so <code>content/gog.js</code> runs. Only the attributes the adapter reads are real.</p>
+
+    <!-- Game page: the id sits on the layout, the pill goes after the h1. -->
+    <div class="layout" card-product="1002">
+      <h1 class="productcard-basics__title">The Witcher 3: Wild Hunt – Game of the Year Edition</h1>
+    </div>
+
+    <h2>Catalog tiles</h2>
+    <product-tile>
+      <a class="product-tile" data-product-id="1001" href="#">
+        <div class="product-tile__image-wrapper"><img alt="Cyberpunk 2077"></div>
+        <div class="product-tile__info"><div class="product-tile__title"><product-title selenium-id="productTitle">Cyberpunk 2077</product-title></div></div>
+      </a>
+    </product-tile>
+    <product-tile>
+      <a class="product-tile" data-product-id="2000" href="#">
+        <div class="product-tile__image-wrapper"><img alt="The Witcher 3: Wild Hunt"></div>
+        <div class="product-tile__info"><div class="product-tile__title"><product-title selenium-id="productTitle">The Witcher 3: Wild Hunt</product-title></div></div>
+      </a>
+    </product-tile>
+    <product-tile>
+      <a class="product-tile" data-product-id="3000" href="#">
+        <div class="product-tile__image-wrapper"><img alt="Not Owned Anywhere"></div>
+        <div class="product-tile__info"><div class="product-tile__title"><product-title selenium-id="productTitle">Not Owned Anywhere</product-title></div></div>
+      </a>
+    </product-tile>
+
+    <h2>Related tiles (AngularJS, attribute interpolated later)</h2>
+    <a id="unrendered" product-tile-id="{{ product.id }}" href="#">Placeholder tile</a>
+    <a id="rendered" product-tile-id="1002" href="#">The Witcher 3 GOTY</a>
+
+    <h2>Nav</h2>
+    <nav><a menu-product="1001999" href="#">Cyberpunk 2077 (another edition)</a></nav>
+  </body>
+</html>
