@@ -36,20 +36,19 @@ and warnings.
   unavailable" means the store's `webapi_token` could not be read; ID matching
   still works. Switching to the Web API method in Settings restores names.
 
-## With the workspace (`../_workshop/`, private)
+## Checks and tests
+
+With [firefox-tools](https://github.com/inklikeurine/firefox-tools) cloned
+next to this repository (see [AGENTS.md](../AGENTS.md)):
 
 ```sh
-node ../_workshop/tools/check.mjs cross-store-owned              # every AGENTS.md rule + web-ext lint
-node ../_workshop/harness/run.mjs cross-store-owned --tests      # headless suites (common, background, content)
-node ../_workshop/harness/run.mjs cross-store-owned --tests --suite content   # one suite
-sh ../_workshop/review/cross-store-owned/live-gog.sh             # live check of the GOG adapter
-node ../_workshop/harness/run.mjs cross-store-owned --spec       # suites + live check from review/cross-store-owned/harness.json
+node ../firefox-tools/tools/check.mjs cross-store-owned              # every AGENTS.md rule + web-ext lint
+node ../firefox-tools/harness/run.mjs cross-store-owned --tests      # headless suites (common, background, content)
+node ../firefox-tools/harness/run.mjs cross-store-owned --tests --suite content   # one suite
+node ../firefox-tools/harness/run.mjs cross-store-owned --spec       # suites + live check from tests/harness.json
 ```
 
-Run `live-gog.sh` before `--spec`: both write `out/cross-store-owned/result.json`,
-and the validator only accepts the spec run's.
-
-The live check serves `_workshop/fixtures/cross-store-owned/steam.html` at a
+The live check serves `tests/fixtures/steam.html` at a
 `store.steampowered.com` URL so the Steam content script runs against it,
 seeds `maps`, both libraries and the owned-on-both list from the background,
 and checks the badges, the toolbar badge, search, the popup and the options

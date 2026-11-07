@@ -169,7 +169,7 @@ are documented in [architecture.md](./architecture.md).
 
 ## Testing
 
-Headless suites in `_workshop/tests/cross-store-owned/`:
+Headless suites in `tests/`:
 
 - `common.test.mjs` — the title normaliser, settings defaults and type checks,
   credentials, hidden-badge helpers, formatting helpers.
@@ -237,9 +237,8 @@ See the README's **Known limitations**; the research behind each is in
 
 ## Release checklist
 
-- Bump `version` in `manifest.json`; add the `CHANGELOG.md` entry.
-- `node ../_workshop/tools/check.mjs cross-store-owned` clean;
-  `sh ../_workshop/review/cross-store-owned/live-gog.sh`, then
-  `node ../_workshop/harness/run.mjs cross-store-owned --spec` pass.
+- In one release pull request: bump `version` in `manifest.json` once for the whole batch, and add the `CHANGELOG.md` entry.
+- `node ../firefox-tools/tools/check.mjs cross-store-owned` clean and
+  `node ../firefox-tools/harness/run.mjs cross-store-owned --spec` passes.
 - Manual checklist above in a fresh profile, logged in to both stores.
 - `web-ext build --source-dir ./cross-store-owned`; sign on AMO as unlisted.
