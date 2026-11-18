@@ -86,10 +86,8 @@
 
 ## Optional / future functionality
 
-- Epic / Humble / itch adapters (IsThereAnyDeal has shop IDs for all; Epic
-  has no library endpoint, so it would need a manual import).
-- Login detection on GOG pages (the header markup that would show it has not
-  been checked).
+- Epic, Humble and itch.io libraries: [#4](https://github.com/inklikeurine/firefox-cross-store-owned/issues/4)
+- Noticing logins on GOG pages: [#5](https://github.com/inklikeurine/firefox-cross-store-owned/issues/5)
 - A "hide DLC badges" toggle was considered and dropped: neither library API
   reliably flags DLC.
 
