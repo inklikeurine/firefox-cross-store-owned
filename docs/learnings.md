@@ -196,13 +196,10 @@ awkward and are worth knowing before trying something new.
 
 ## 7. Ideas not done
 
-- Epic / Humble / itch support — the adapter pattern (`collect / matchKey / matchTitle / describe`) was designed
-  for it; ITAD has shop IDs for all of them, but Epic has no library endpoint (would need a bookmarklet or
-  Legendary-style login).
-- Steam's React wishlist page is covered by the image-link fallback without its markup having been inspected;
-  a dedicated selector may badge more of it.
-- Login detection on GOG pages (only Steam's header is read today).
-- Image-only Steam capsules with empty `alt` get no title, so they only match by ID.
+- Epic, Humble and itch.io libraries: [#4](https://github.com/inklikeurine/firefox-cross-store-owned/issues/4)
+- Noticing logins on GOG pages: [#5](https://github.com/inklikeurine/firefox-cross-store-owned/issues/5)
+- Badging more of Steam's wishlist page: [#6](https://github.com/inklikeurine/firefox-cross-store-owned/issues/6)
+- Matching Steam picture-only cards with no title: [#7](https://github.com/inklikeurine/firefox-cross-store-owned/issues/7)
+- Signing for permanent install: [#8](https://github.com/inklikeurine/firefox-cross-store-owned/issues/8)
 - A "hide DLC badges" toggle was considered and dropped: neither library API reliably flags DLC, so it would have
   been a content-side guess.
-- Signing for permanent install (unlisted AMO submission) — see the README's Installation section.
